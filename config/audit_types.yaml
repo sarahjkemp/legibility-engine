@@ -1,0 +1,42 @@
+audit_types:
+  b2b_saas:
+    label: "B2B SaaS / tech"
+    proxy_weights:
+      corroboration: 0.25
+      provenance: 0.20
+      consistency: 0.15
+      authority_hierarchy: 0.25
+      behavioural_reliability: 0.15
+  consumer_brand:
+    label: "Consumer brand"
+    proxy_weights:
+      corroboration: 0.20
+      provenance: 0.10
+      consistency: 0.20
+      authority_hierarchy: 0.15
+      behavioural_reliability: 0.35
+  regulated:
+    label: "Regulated"
+    proxy_weights:
+      corroboration: 0.20
+      provenance: 0.30
+      consistency: 0.15
+      authority_hierarchy: 0.20
+      behavioural_reliability: 0.15
+  founder_led:
+    label: "Founder-led / personal brand"
+    proxy_weights:
+      corroboration: 0.25
+      provenance: 0.15
+      consistency: 0.25
+      authority_hierarchy: 0.25
+      behavioural_reliability: 0.10
+  default:
+    label: "Default / unknown"
+    proxy_weights:
+      corroboration: 0.25
+      provenance: 0.20
+      consistency: 0.20
+      authority_hierarchy: 0.20
+      behavioural_reliability: 0.15
+

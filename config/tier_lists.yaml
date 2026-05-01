@@ -1,0 +1,22 @@
+tier_1_domains:
+  - bbc.com
+  - ft.com
+  - bloomberg.com
+  - reuters.com
+  - theguardian.com
+  - nytimes.com
+  - wsj.com
+
+tier_2_domains:
+  - techcrunch.com
+  - sifted.eu
+  - forbes.com
+  - businessinsider.com
+  - wired.com
+  - fastcompany.com
+
+owned_surface_domains:
+  - linkedin.com
+  - medium.com
+  - substack.com
+

@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: legibility-engine
+    env: python
+    plan: starter
+    buildCommand: pip install -e .
+    startCommand: uvicorn legibility_engine.app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: LEGIBILITY_TIMEOUT_SECONDS
+        value: "20"
+      - key: LEGIBILITY_USER_AGENT
+        value: "LegibilityEngine/0.1 (+https://sjklabs.co)"

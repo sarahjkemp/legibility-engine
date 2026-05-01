@@ -1,0 +1,42 @@
+audit_type_benchmarks:
+  b2b_saas:
+    composite: 78
+    proxies:
+      corroboration: 80
+      provenance: 75
+      consistency: 80
+      authority_hierarchy: 75
+      behavioural_reliability: 78
+  consumer_brand:
+    composite: 74
+    proxies:
+      corroboration: 72
+      provenance: 65
+      consistency: 74
+      authority_hierarchy: 68
+      behavioural_reliability: 82
+  regulated:
+    composite: 82
+    proxies:
+      corroboration: 78
+      provenance: 88
+      consistency: 76
+      authority_hierarchy: 80
+      behavioural_reliability: 80
+  founder_led:
+    composite: 76
+    proxies:
+      corroboration: 78
+      provenance: 68
+      consistency: 82
+      authority_hierarchy: 76
+      behavioural_reliability: 68
+  default:
+    composite: 75
+    proxies:
+      corroboration: 76
+      provenance: 72
+      consistency: 74
+      authority_hierarchy: 72
+      behavioural_reliability: 72
+
