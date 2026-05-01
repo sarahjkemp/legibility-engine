@@ -52,12 +52,17 @@ async def dashboard() -> str:
     .panel {{ background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 20px; box-shadow: 0 14px 40px rgba(75, 47, 24, 0.08); }}
     label {{ display:block; font-size:0.95rem; margin: 12px 0 6px; }}
     input, select, button {{ width: 100%; box-sizing: border-box; border-radius: 12px; border: 1px solid var(--line); padding: 12px 14px; font: inherit; }}
-    button {{ background: var(--accent); color: white; border: none; margin-top: 16px; cursor: pointer; }}
+    button {{ background: var(--accent); color: white; border: none; margin-top: 16px; cursor: pointer; transition: opacity 0.2s ease; }}
     button:hover {{ opacity: 0.94; }}
+    button[disabled] {{ opacity: 0.72; cursor: wait; }}
     table {{ width: 100%; border-collapse: collapse; font-size: 0.95rem; }}
     th, td {{ text-align: left; padding: 12px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }}
     .small {{ font-size: 0.9rem; color: var(--muted); }}
     #status {{ min-height: 24px; margin-top: 10px; }}
+    .status-row {{ display:flex; align-items:center; gap:10px; margin-top:10px; min-height:28px; }}
+    .spinner {{ width:18px; height:18px; border-radius:999px; border:2px solid #d8c5b1; border-top-color: var(--accent); animation: spin 0.8s linear infinite; display:none; }}
+    .spinner.active {{ display:inline-block; }}
+    @keyframes spin {{ from {{ transform: rotate(0deg); }} to {{ transform: rotate(360deg); }} }}
     @media (max-width: 860px) {{ .grid {{ grid-template-columns: 1fr; }} }}
   </style>
 </head>
@@ -82,11 +87,15 @@ async def dashboard() -> str:
         </select>
         <label>Companies House ID (optional)</label>
         <input id="companies_house_id" placeholder="Optional" />
-        <button onclick="runAudit()">Run audit</button>
-        <div id="status" class="small"></div>
+        <button id="run_button" onclick="runAudit()">Run audit</button>
+        <div class="status-row">
+          <span id="spinner" class="spinner" aria-hidden="true"></span>
+          <div id="status" class="small"></div>
+        </div>
       </section>
       <section class="panel">
         <h2>Recent Audits</h2>
+        <p class="small">Coverage reporting is included in each audit so low evidence coverage is visible, not mistaken for low brand quality.</p>
         <table>
           <thead><tr><th>Company</th><th>Type</th><th>Score</th><th>Gap</th><th></th></tr></thead>
           <tbody>{rows}</tbody>
@@ -95,6 +104,61 @@ async def dashboard() -> str:
     </div>
   </main>
   <script>
+    function formatError(detail) {{
+      if (!detail) return 'Audit failed.';
+      if (typeof detail === 'string') return detail;
+      if (Array.isArray(detail)) {{
+        return detail.map(item => {{
+          if (typeof item === 'string') return item;
+          if (item && typeof item === 'object') {{
+            const loc = Array.isArray(item.loc) ? item.loc.join(' → ') : '';
+            const msg = item.msg || JSON.stringify(item);
+            return loc ? `${{loc}}: ${{msg}}` : msg;
+          }}
+          return String(item);
+        }}).join(' | ');
+      }}
+      if (typeof detail === 'object') {{
+        return detail.message || detail.error || JSON.stringify(detail);
+      }}
+      return String(detail);
+    }}
+
+    let auditTimer = null;
+
+    function setRunningState(isRunning) {{
+      const button = document.getElementById('run_button');
+      const spinner = document.getElementById('spinner');
+      button.disabled = isRunning;
+      button.textContent = isRunning ? 'Running audit...' : 'Run audit';
+      spinner.classList.toggle('active', isRunning);
+    }}
+
+    function startProgressMessages() {{
+      const status = document.getElementById('status');
+      const startedAt = Date.now();
+      const messages = [
+        'Fetching the site and checking metadata...',
+        'Sampling supporting pages and evidence surfaces...',
+        'Running external checks and structured analysis...',
+        'Still working. Free hosting can make this a bit slow...',
+      ];
+      let index = 0;
+      status.textContent = messages[0];
+      auditTimer = window.setInterval(() => {{
+        index = Math.min(index + 1, messages.length - 1);
+        const elapsed = Math.round((Date.now() - startedAt) / 1000);
+        status.textContent = `${{messages[index]}} (${{elapsed}}s)`;
+      }}, 3500);
+    }}
+
+    function stopProgressMessages() {{
+      if (auditTimer) {{
+        window.clearInterval(auditTimer);
+        auditTimer = null;
+      }}
+    }}
+
     async function runAudit() {{
       const payload = {{
         company_name: document.getElementById('company_name').value,
@@ -103,19 +167,30 @@ async def dashboard() -> str:
         companies_house_id: document.getElementById('companies_house_id').value || null
       }};
       const status = document.getElementById('status');
-      status.textContent = 'Running audit... this can take a little while.';
-      const resp = await fetch('/api/audits', {{
-        method: 'POST',
-        headers: {{ 'Content-Type': 'application/json' }},
-        body: JSON.stringify(payload)
-      }});
-      const data = await resp.json();
-      if (!resp.ok) {{
-        status.textContent = data.detail || 'Audit failed.';
-        return;
+      setRunningState(true);
+      startProgressMessages();
+      try {{
+        const resp = await fetch('/api/audits', {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify(payload)
+        }});
+        const data = await resp.json();
+        if (!resp.ok) {{
+          stopProgressMessages();
+          setRunningState(false);
+          status.textContent = formatError(data.detail || data);
+          return;
+        }}
+        stopProgressMessages();
+        setRunningState(false);
+        status.innerHTML = `Audit complete. <a href="/audits/${{data.audit_id}}">Open result</a>`;
+        window.location.reload();
+      }} catch (error) {{
+        stopProgressMessages();
+        setRunningState(false);
+        status.textContent = error?.message || 'Network error while running audit.';
       }}
-      status.innerHTML = `Audit complete. <a href="/audits/${{data.audit_id}}">Open result</a>`;
-      window.location.reload();
     }}
   </script>
 </body>
@@ -125,21 +200,24 @@ async def dashboard() -> str:
 
 @app.post("/api/audits")
 async def create_audit(request: CreateAuditRequest) -> dict:
-    target = AuditTarget(
-        company_name=request.company_name,
-        primary_url=request.primary_url,
-        audit_type=request.audit_type,
-        companies_house_id=request.companies_house_id,
-    )
-    result = await run_audit(target, config=load_audit_config(), settings=settings)
-    paths = save_audit_result(result, _audits_dir())
-    return {
-        "audit_id": result.audit_id,
-        "composite": result.scores.composite,
-        "gap": result.scores.gap,
-        "json_path": str(paths["json"]),
-        "worksheet_path": str(paths["worksheet"]),
-    }
+    try:
+        target = AuditTarget(
+            company_name=request.company_name,
+            primary_url=request.primary_url,
+            audit_type=request.audit_type,
+            companies_house_id=request.companies_house_id,
+        )
+        result = await run_audit(target, config=load_audit_config(), settings=settings)
+        paths = save_audit_result(result, _audits_dir())
+        return {
+            "audit_id": result.audit_id,
+            "composite": result.scores.composite,
+            "gap": result.scores.gap,
+            "json_path": str(paths["json"]),
+            "worksheet_path": str(paths["worksheet"]),
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Audit run failed: {type(exc).__name__}: {exc}") from exc
 
 
 @app.get("/api/audits")
@@ -191,6 +269,13 @@ async def audit_detail(audit_id: str) -> str:
     <p><a href="/">← Back</a></p>
     <h1>{result.target.company_name}</h1>
     <p>Composite: <strong>{result.scores.composite}</strong> | Benchmark: <strong>{result.scores.benchmark}</strong> | Gap: <strong>{result.scores.gap}</strong></p>
+    <section style='background:#fffaf4;border:1px solid #dccfbe;border-radius:16px;padding:18px;margin:14px 0;'>
+      <h2>Source Coverage</h2>
+      <p><strong>Checked:</strong> {result.source_coverage.checked} | <strong>Found:</strong> {result.source_coverage.found} | <strong>Missing:</strong> {result.source_coverage.missing} | <strong>Unavailable:</strong> {result.source_coverage.unavailable}</p>
+      <ul>
+        {"".join(f"<li><strong>{entry.source_class}</strong>: {entry.status} — {entry.detail}</li>" for entry in result.source_coverage.by_source_class)}
+      </ul>
+    </section>
     {body}
   </main>
 </body>

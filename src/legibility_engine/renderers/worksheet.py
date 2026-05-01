@@ -13,8 +13,23 @@ def render_markdown_worksheet(result: AuditResult) -> str:
         f"- Benchmark: `{result.scores.benchmark}`",
         f"- Gap: `{result.scores.gap}`",
         "",
-        "## Proxy Summary",
+        "## Source Coverage",
+        f"- Checked: `{result.source_coverage.checked}`",
+        f"- Found: `{result.source_coverage.found}`",
+        f"- Missing: `{result.source_coverage.missing}`",
+        f"- Unavailable: `{result.source_coverage.unavailable}`",
+        "",
+        "### Coverage By Source Class",
     ]
+    for entry in result.source_coverage.by_source_class:
+        lines.append(
+            f"- `{entry.source_class}`: `{entry.status}` ({entry.confidence}) — {entry.detail}"
+        )
+
+    lines.extend([
+        "",
+        "## Proxy Summary",
+    ])
     for proxy_name, summary in result.scores.by_proxy.items():
         lines.append(
             f"- `{proxy_name}`: score `{summary.score}`, benchmark `{summary.benchmark}`, gap `{summary.gap}`, confidence `{summary.confidence}`"
@@ -32,4 +47,3 @@ def render_markdown_worksheet(result: AuditResult) -> str:
             for key, value in proxy.sub_scores.items():
                 lines.append(f"- `{key}`: `{value}`")
     return "\n".join(lines) + "\n"
-

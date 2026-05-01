@@ -74,14 +74,29 @@ class ScoreSummary(BaseModel):
     by_proxy: dict[str, ProxyScoreSummary]
 
 
+class CoverageEntry(BaseModel):
+    source_class: str
+    status: Literal["checked", "found", "missing", "unavailable"]
+    detail: str
+    confidence: float = 0.0
+
+
+class CoverageSummary(BaseModel):
+    checked: int
+    found: int
+    missing: int
+    unavailable: int
+    by_source_class: list[CoverageEntry] = Field(default_factory=list)
+
+
 class AuditResult(BaseModel):
     audit_id: str = Field(default_factory=lambda: str(uuid4()))
     created_at: datetime = Field(default_factory=utcnow)
     engine_version: str = "0.1.0"
     target: AuditTarget
     scores: ScoreSummary
+    source_coverage: CoverageSummary
     proxy_results: list[ProxyResult]
     analyst_notes: str | None = None
     report_status: str = "draft"
     client_visible_findings: list[Finding] = Field(default_factory=list)
-

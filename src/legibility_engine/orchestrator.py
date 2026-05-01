@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 
 from .config import AuditConfig, EngineSettings, load_audit_config
+from .coverage import build_coverage_summary
 from .models import AuditResult, AuditTarget
 from .proxies.authority import AuthorityHierarchyProxy
 from .proxies.behavioural import BehaviouralReliabilityProxy
@@ -32,9 +33,10 @@ async def run_audit(
         *(proxy.run(target=target, config=config, settings=settings) for proxy in DEFAULT_PROXIES)
     )
     scores = build_score_summary(proxy_results, target.audit_type, config)
+    coverage = build_coverage_summary(list(proxy_results))
     return AuditResult(
         target=target,
         scores=scores,
+        source_coverage=coverage,
         proxy_results=list(proxy_results),
     )
-
