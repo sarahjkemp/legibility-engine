@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from .coverage import build_coverage_summary
 from .models import AuditResult
 from .renderers.worksheet import render_markdown_worksheet
 
@@ -29,7 +30,12 @@ def save_audit_result(result: AuditResult, output_dir: Path) -> dict[str, Path]:
 
 
 def load_audit_result(path: Path) -> AuditResult:
-    return AuditResult.model_validate_json(path.read_text(encoding="utf-8"))
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if "source_coverage" not in data:
+        partial = AuditResult.model_validate({**data, "source_coverage": {"checked": 0, "found": 0, "missing": 0, "unavailable": 0, "by_source_class": []}})
+        coverage = build_coverage_summary(partial.proxy_results)
+        data["source_coverage"] = coverage.model_dump(mode="json")
+    return AuditResult.model_validate(data)
 
 
 def list_audit_results(output_dir: Path) -> list[dict]:

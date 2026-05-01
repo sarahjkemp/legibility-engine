@@ -4,12 +4,13 @@ from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel, HttpUrl
 
 from .config import EngineSettings, load_audit_config
 from .models import AuditTarget
 from .orchestrator import run_audit
+from .report import render_report
 from .storage import find_audit_by_id, list_audit_results, save_audit_result
 
 
@@ -233,6 +234,27 @@ async def api_get_audit(audit_id: str) -> dict:
     return result.model_dump(mode="json")
 
 
+@app.get("/audits/{audit_id}/report", response_class=HTMLResponse)
+async def audit_client_report(audit_id: str) -> str:
+    result = find_audit_by_id(_audits_dir(), audit_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Audit not found")
+    return render_report(result, "html")
+
+
+@app.get("/audits/{audit_id}/report.pdf")
+async def audit_client_report_pdf(audit_id: str) -> Response:
+    result = find_audit_by_id(_audits_dir(), audit_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Audit not found")
+    pdf = render_report(result, "pdf")
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{audit_id}-client-report.pdf"'},
+    )
+
+
 @app.get("/audits/{audit_id}", response_class=HTMLResponse)
 async def audit_detail(audit_id: str) -> str:
     result = find_audit_by_id(_audits_dir(), audit_id)
@@ -262,6 +284,8 @@ async def audit_detail(audit_id: str) -> str:
     body {{ font-family: Georgia, 'Times New Roman', serif; background:#f7f1e8; color:#1f1a17; margin:0; }}
     main {{ max-width: 960px; margin: 0 auto; padding: 36px 20px 64px; }}
     a {{ color:#a3472f; }}
+    .actions {{ display:flex; gap:16px; flex-wrap:wrap; margin: 18px 0 24px; }}
+    .actions a {{ text-decoration:none; background:#1f3d2e; color:#f7f1e8; padding:12px 16px; border-radius:999px; }}
   </style>
 </head>
 <body>
@@ -269,6 +293,10 @@ async def audit_detail(audit_id: str) -> str:
     <p><a href="/">← Back</a></p>
     <h1>{result.target.company_name}</h1>
     <p>Composite: <strong>{result.scores.composite}</strong> | Benchmark: <strong>{result.scores.benchmark}</strong> | Gap: <strong>{result.scores.gap}</strong></p>
+    <div class="actions">
+      <a href="/audits/{audit_id}/report">View Client Report</a>
+      <a href="/audits/{audit_id}/report.pdf">Download PDF</a>
+    </div>
     <section style='background:#fffaf4;border:1px solid #dccfbe;border-radius:16px;padding:18px;margin:14px 0;'>
       <h2>Source Coverage</h2>
       <p><strong>Checked:</strong> {result.source_coverage.checked} | <strong>Found:</strong> {result.source_coverage.found} | <strong>Missing:</strong> {result.source_coverage.missing} | <strong>Unavailable:</strong> {result.source_coverage.unavailable}</p>
