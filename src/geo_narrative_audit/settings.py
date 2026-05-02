@@ -18,6 +18,10 @@ class AppSettings(BaseSettings):
         default="audits",
         validation_alias=AliasChoices("GEO_AUDIT_AUDITS_DIR", "LEGIBILITY_AUDITS_DIR"),
     )
+    website_additional_page_limit: int = Field(
+        default=4,
+        validation_alias=AliasChoices("GEO_AUDIT_WEBSITE_PAGE_LIMIT", "LEGIBILITY_WEBSITE_PAGE_LIMIT"),
+    )
 
     model_config = SettingsConfigDict(
         populate_by_name=True,

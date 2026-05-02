@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from statistics import mean
 
-from .fetch import compact_terms, fetch_page_snapshot, first_meaningful_sentence, infer_label
+from .fetch import compact_terms, discover_internal_pages, fetch_page_snapshot, first_meaningful_sentence, infer_label
 from .llm import AuditLLM
 from .models import ActionItem, AuditInput, AuditRecord, ChannelSurface, ScoreCard
 from .settings import AppSettings
@@ -35,7 +35,10 @@ async def run_audit(audit_input: AuditInput, settings: AppSettings) -> AuditReco
 async def _collect_channels(audit_input: AuditInput, settings: AppSettings) -> list[ChannelSurface]:
     channels: list[ChannelSurface] = []
     declared = _declared_surfaces(audit_input)
+    website_snapshots: list[dict] = []
+    existing_urls: set[str] = set()
     for key, label, role, platform, surface_type, url, source_text in declared:
+        existing_urls.add(url)
         if source_text:
             cleaned = " ".join(source_text.split())
             message = first_meaningful_sentence(cleaned) or cleaned[:260]
@@ -60,6 +63,8 @@ async def _collect_channels(audit_input: AuditInput, settings: AppSettings) -> l
             continue
 
         page = await fetch_page_snapshot(url, settings)
+        if platform == "website":
+            website_snapshots.append(page)
         blocked = not bool(page["text"])
         message = first_meaningful_sentence(page["excerpt"] or page["text"])
         if not message:
@@ -73,6 +78,40 @@ async def _collect_channels(audit_input: AuditInput, settings: AppSettings) -> l
                 platform=platform,
                 url=url,
                 surface_type=surface_type,
+                fetched=bool(page["text"]),
+                blocked=blocked,
+                blocked_reason=page.get("blocked_reason"),
+                message=message,
+                raw_excerpt=(page["excerpt"] or page["text"][:500]) if page["text"] or page["excerpt"] else None,
+                title=page["title"],
+                meta_description=page["meta_description"],
+                word_count=page["word_count"],
+            )
+        )
+
+    discovered_pages = discover_internal_pages(
+        str(audit_input.website_url),
+        website_snapshots,
+        existing_urls,
+        settings.website_additional_page_limit,
+    )
+    for index, url in enumerate(discovered_pages, start=1):
+        page = await fetch_page_snapshot(url, settings)
+        website_snapshots.append(page)
+        blocked = not bool(page["text"])
+        message = first_meaningful_sentence(page["excerpt"] or page["text"])
+        if not message:
+            reason = page.get("blocked_reason")
+            message = reason or "No usable content could be captured from this website page."
+        label = page["title"] or f"Website Page {index}"
+        channels.append(
+            ChannelSurface(
+                key=f"website_discovered_{index}",
+                label=label,
+                role="company",
+                platform="website",
+                url=url,
+                surface_type="content",
                 fetched=bool(page["text"]),
                 blocked=blocked,
                 blocked_reason=page.get("blocked_reason"),

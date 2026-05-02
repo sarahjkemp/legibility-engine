@@ -1,4 +1,5 @@
 from geo_narrative_audit.analysis import _declared_surfaces, _fallback_analysis
+from geo_narrative_audit.fetch import discover_internal_pages
 from geo_narrative_audit.models import AuditInput, ChannelSurface
 
 
@@ -69,3 +70,26 @@ def test_declared_surfaces_prefers_pasted_platform_text() -> None:
     youtube_content = next(surface for surface in surfaces if surface[0] == "company_youtube_content_1")
     assert youtube_content[5] == "https://youtube.com/watch?v=123"
     assert youtube_content[6] == "This video explains how SJK Labs approaches authority building for AI retrieval."
+
+
+def test_discover_internal_pages_prefers_high_signal_website_paths() -> None:
+    snapshots = [
+        {
+            "internal_links": [
+                "https://sjklabs.co/privacy-policy",
+                "https://sjklabs.co/services",
+                "https://sjklabs.co/insights",
+                "https://sjklabs.co/methodology",
+                "https://sjklabs.co/about",
+            ]
+        }
+    ]
+    discovered = discover_internal_pages(
+        "https://sjklabs.co",
+        snapshots,
+        existing_urls={"https://sjklabs.co", "https://sjklabs.co/about"},
+        limit=3,
+    )
+    assert "https://sjklabs.co/methodology" in discovered
+    assert "https://sjklabs.co/services" in discovered
+    assert "https://sjklabs.co/privacy-policy" not in discovered

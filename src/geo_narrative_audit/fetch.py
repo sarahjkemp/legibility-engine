@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from urllib.parse import urljoin
 from typing import Iterable
 from urllib.parse import urlparse
 
@@ -28,6 +29,7 @@ async def fetch_page_snapshot(url: str, settings: AppSettings) -> dict:
             "headings": [],
             "outbound_links": 0,
             "word_count": 0,
+            "internal_links": [],
             "blocked_reason": "The page could not be fetched.",
         }
 
@@ -39,13 +41,17 @@ async def fetch_page_snapshot(url: str, settings: AppSettings) -> dict:
     text = re.sub(r"\s+", " ", soup.get_text(" ", strip=True)).strip()
     internal_host = urlparse(url).netloc.replace("www.", "")
     outbound_links = 0
+    internal_links: list[str] = []
     for anchor in soup.select("a[href]"):
         href = anchor.get("href", "")
-        parsed = urlparse(href)
+        absolute = urljoin(url, href)
+        parsed = urlparse(absolute)
         if parsed.scheme in {"http", "https"}:
             host = parsed.netloc.replace("www.", "")
             if host and host != internal_host:
                 outbound_links += 1
+            elif host == internal_host:
+                internal_links.append(_normalize_internal_url(absolute))
     excerpt = " ".join(part for part in [title, description, *headings[:2]] if part) or text[:900]
     blocked_reason = _blocked_reason(url, title, description, text)
     if blocked_reason:
@@ -59,6 +65,7 @@ async def fetch_page_snapshot(url: str, settings: AppSettings) -> dict:
         "headings": headings,
         "outbound_links": outbound_links,
         "word_count": len(text.split()),
+        "internal_links": list(dict.fromkeys(link for link in internal_links if link)),
         "blocked_reason": blocked_reason,
     }
 
@@ -143,6 +150,30 @@ def _meta_content(soup: BeautifulSoup, name: str) -> str | None:
     return tag.get("content", "").strip() or None if tag else None
 
 
+def discover_internal_pages(
+    website_url: str,
+    snapshots: list[dict],
+    existing_urls: set[str],
+    limit: int,
+) -> list[str]:
+    if limit <= 0:
+        return []
+
+    homepage = _normalize_internal_url(website_url)
+    candidates: dict[str, int] = {}
+    for snapshot in snapshots:
+        for link in snapshot.get("internal_links", []):
+            normalized = _normalize_internal_url(link)
+            if not normalized or normalized in existing_urls or normalized == homepage:
+                continue
+            if _is_ignorable_internal_path(normalized):
+                continue
+            candidates[normalized] = max(candidates.get(normalized, -999), _score_internal_path(normalized))
+
+    ranked = sorted(candidates.items(), key=lambda item: (-item[1], item[0]))
+    return [url for url, _score in ranked[:limit]]
+
+
 def _blocked_reason(url: str, title: str | None, description: str | None, text: str) -> str | None:
     host = urlparse(url).netloc.lower()
     combined = " ".join(part for part in [title or "", description or "", text[:1200]] if part).lower()
@@ -160,3 +191,62 @@ def _blocked_reason(url: str, title: str | None, description: str | None, text: 
         if "discover more from" in combined and "subscribe now" in combined and len(combined) < 500:
             return "The supplied Substack URL returned mostly subscription chrome rather than enough article or publication text to assess."
     return None
+
+
+def _normalize_internal_url(url: str) -> str:
+    parsed = urlparse(url)
+    path = parsed.path or "/"
+    normalized_path = re.sub(r"/{2,}", "/", path).rstrip("/") or "/"
+    return f"{parsed.scheme}://{parsed.netloc.lower()}{normalized_path}"
+
+
+def _score_internal_path(url: str) -> int:
+    path = urlparse(url).path.lower()
+    score = 0
+    preferred_tokens = {
+        "about": 8,
+        "services": 8,
+        "service": 7,
+        "work": 7,
+        "case-study": 9,
+        "case-studies": 9,
+        "results": 7,
+        "insights": 7,
+        "blog": 6,
+        "method": 8,
+        "methodology": 9,
+        "approach": 8,
+        "framework": 8,
+        "who-we-are": 8,
+        "why": 5,
+    }
+    for token, value in preferred_tokens.items():
+        if token in path:
+            score += value
+    score -= path.count("/") * 2
+    if len(path) <= 1:
+        score -= 20
+    return score
+
+
+def _is_ignorable_internal_path(url: str) -> bool:
+    path = urlparse(url).path.lower()
+    ignored_tokens = (
+        "privacy",
+        "terms",
+        "cookie",
+        "cookies",
+        "login",
+        "signin",
+        "sign-in",
+        "wp-admin",
+        "tag/",
+        "author/",
+        "feed",
+        "category/",
+        "page/",
+        "cart",
+        "checkout",
+    )
+    ignored_suffixes = (".jpg", ".jpeg", ".png", ".gif", ".svg", ".pdf", ".zip")
+    return any(token in path for token in ignored_tokens) or path.endswith(ignored_suffixes)
