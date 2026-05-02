@@ -60,7 +60,7 @@ def _channel_snapshots(record: AuditResult) -> list[dict]:
     samples = raw.get("vocabulary_recurrence", {}).get("channel_snapshots") or raw.get("channel_snapshots") or []
     snapshots = []
     for item in samples:
-        label = f"{item.get('role', '').title()} {item.get('platform', '').title()}".strip()
+        label = item.get("label") or f"{item.get('role', '').title()} {item.get('platform', '').title()}".strip()
         if label.lower() == "company website":
             label = "Website"
         snapshots.append(
