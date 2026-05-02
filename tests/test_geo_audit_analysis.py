@@ -63,13 +63,17 @@ def test_declared_surfaces_prefers_pasted_platform_text() -> None:
     audit_input = AuditInput(
         company_name="SJK Labs",
         website_url="https://sjklabs.co",
-        company_youtube_video_urls=["https://youtube.com/watch?v=123"],
+        company_linkedin_post_texts=["Post one about The Scriptwriter Test."],
+        company_substack_article_texts=["A Substack piece about narrative architecture for AI retrieval."],
         company_youtube_video_texts=["This video explains how SJK Labs approaches authority building for AI retrieval."],
     )
     surfaces = _declared_surfaces(audit_input)
+    assert not any("profile" in surface[0] for surface in surfaces)
     youtube_content = next(surface for surface in surfaces if surface[0] == "company_youtube_content_1")
-    assert youtube_content[5] == "https://youtube.com/watch?v=123"
+    assert youtube_content[5] == "manual://company/youtube/1"
     assert youtube_content[6] == "This video explains how SJK Labs approaches authority building for AI retrieval."
+    substack_content = next(surface for surface in surfaces if surface[0] == "company_substack_content_1")
+    assert substack_content[6] == "A Substack piece about narrative architecture for AI retrieval."
 
 
 def test_discover_internal_pages_prefers_high_signal_website_paths() -> None:

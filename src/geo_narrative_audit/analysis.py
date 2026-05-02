@@ -464,116 +464,27 @@ def _declared_surfaces(audit_input: AuditInput) -> list[tuple[str, str, str, str
     if audit_input.about_page_url:
         surfaces.append(("about_page", "About Page", "company", "website", "content", str(audit_input.about_page_url), None))
 
-    surfaces.extend(
-        _platform_surfaces(
-            "company",
-            "Company",
-            "linkedin",
-            audit_input.company_linkedin_url,
-            audit_input.company_linkedin_post_urls,
-            audit_input.company_linkedin_post_texts,
-        )
-    )
-    surfaces.extend(
-        _platform_surfaces(
-            "company",
-            "Company",
-            "substack",
-            audit_input.company_substack_url,
-            audit_input.company_substack_article_urls,
-            [],
-        )
-    )
-    surfaces.extend(
-        _platform_surfaces(
-            "company",
-            "Company",
-            "medium",
-            audit_input.company_medium_url,
-            audit_input.company_medium_article_urls,
-            audit_input.company_medium_article_texts,
-        )
-    )
-    surfaces.extend(
-        _platform_surfaces(
-            "company",
-            "Company",
-            "youtube",
-            audit_input.company_youtube_url,
-            audit_input.company_youtube_video_urls,
-            audit_input.company_youtube_video_texts,
-        )
-    )
+    surfaces.extend(_manual_text_surfaces("company", "Company", "linkedin", audit_input.company_linkedin_post_texts))
+    surfaces.extend(_manual_text_surfaces("company", "Company", "substack", audit_input.company_substack_article_texts))
+    surfaces.extend(_manual_text_surfaces("company", "Company", "medium", audit_input.company_medium_article_texts))
+    surfaces.extend(_manual_text_surfaces("company", "Company", "youtube", audit_input.company_youtube_video_texts))
 
     spokesperson = audit_input.spokesperson_name or "Spokesperson"
-    surfaces.extend(
-        _platform_surfaces(
-            "spokesperson",
-            spokesperson,
-            "linkedin",
-            audit_input.spokesperson_linkedin_url,
-            audit_input.spokesperson_linkedin_post_urls,
-            audit_input.spokesperson_linkedin_post_texts,
-        )
-    )
-    surfaces.extend(
-        _platform_surfaces(
-            "spokesperson",
-            spokesperson,
-            "substack",
-            audit_input.spokesperson_substack_url,
-            audit_input.spokesperson_substack_article_urls,
-            [],
-        )
-    )
-    surfaces.extend(
-        _platform_surfaces(
-            "spokesperson",
-            spokesperson,
-            "medium",
-            audit_input.spokesperson_medium_url,
-            audit_input.spokesperson_medium_article_urls,
-            audit_input.spokesperson_medium_article_texts,
-        )
-    )
-    surfaces.extend(
-        _platform_surfaces(
-            "spokesperson",
-            spokesperson,
-            "youtube",
-            audit_input.spokesperson_youtube_url,
-            audit_input.spokesperson_youtube_video_urls,
-            audit_input.spokesperson_youtube_video_texts,
-        )
-    )
+    surfaces.extend(_manual_text_surfaces("spokesperson", spokesperson, "linkedin", audit_input.spokesperson_linkedin_post_texts))
+    surfaces.extend(_manual_text_surfaces("spokesperson", spokesperson, "substack", audit_input.spokesperson_substack_article_texts))
+    surfaces.extend(_manual_text_surfaces("spokesperson", spokesperson, "medium", audit_input.spokesperson_medium_article_texts))
+    surfaces.extend(_manual_text_surfaces("spokesperson", spokesperson, "youtube", audit_input.spokesperson_youtube_video_texts))
     return surfaces
 
 
-def _platform_surfaces(
+def _manual_text_surfaces(
     role: str,
     label_prefix: str,
     platform: str,
-    profile_url: object,
-    content_urls: list[object],
     content_texts: list[str],
 ) -> list[tuple[str, str, str, str, str, str, str | None]]:
     surfaces: list[tuple[str, str, str, str, str, str, str | None]] = []
-    if profile_url:
-        surfaces.append(
-            (
-                f"{role}_{platform}_profile",
-                f"{label_prefix} {platform.title()} Profile",
-                role,
-                platform,
-                "profile",
-                str(profile_url),
-                None,
-            )
-        )
-    max_items = max(len(content_urls), len(content_texts))
-    for index in range(1, min(max_items, 3) + 1):
-        url = str(content_urls[index - 1]) if index - 1 < len(content_urls) else f"manual://{role}/{platform}/{index}"
-        source_text = content_texts[index - 1] if index - 1 < len(content_texts) else None
+    for index, source_text in enumerate(content_texts[:3], start=1):
         surfaces.append(
             (
                 f"{role}_{platform}_content_{index}",
@@ -581,7 +492,7 @@ def _platform_surfaces(
                 role,
                 platform,
                 "content",
-                url,
+                f"manual://{role}/{platform}/{index}",
                 source_text,
             )
         )

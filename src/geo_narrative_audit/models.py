@@ -16,6 +16,7 @@ class AuditInput(BaseModel):
     company_linkedin_post_texts: list[str] = Field(default_factory=list)
     company_substack_url: HttpUrl | None = None
     company_substack_article_urls: list[HttpUrl] = Field(default_factory=list)
+    company_substack_article_texts: list[str] = Field(default_factory=list)
     company_medium_url: HttpUrl | None = None
     company_medium_article_urls: list[HttpUrl] = Field(default_factory=list)
     company_medium_article_texts: list[str] = Field(default_factory=list)
@@ -28,6 +29,7 @@ class AuditInput(BaseModel):
     spokesperson_linkedin_post_texts: list[str] = Field(default_factory=list)
     spokesperson_substack_url: HttpUrl | None = None
     spokesperson_substack_article_urls: list[HttpUrl] = Field(default_factory=list)
+    spokesperson_substack_article_texts: list[str] = Field(default_factory=list)
     spokesperson_medium_url: HttpUrl | None = None
     spokesperson_medium_article_urls: list[HttpUrl] = Field(default_factory=list)
     spokesperson_medium_article_texts: list[str] = Field(default_factory=list)
