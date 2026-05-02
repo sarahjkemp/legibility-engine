@@ -45,22 +45,35 @@ async def create_audit(
     spokesperson_medium_url: str = Form(""),
     spokesperson_youtube_url: str = Form(""),
 ) -> RedirectResponse:
-    audit_input = AuditInput(
-        company_name=company_name.strip(),
-        website_url=website_url.strip(),
-        company_linkedin_url=_blank_to_none(company_linkedin_url),
-        company_substack_url=_blank_to_none(company_substack_url),
-        company_medium_url=_blank_to_none(company_medium_url),
-        company_youtube_url=_blank_to_none(company_youtube_url),
-        spokesperson_name=_blank_to_none(spokesperson_name),
-        spokesperson_linkedin_url=_blank_to_none(spokesperson_linkedin_url),
-        spokesperson_substack_url=_blank_to_none(spokesperson_substack_url),
-        spokesperson_medium_url=_blank_to_none(spokesperson_medium_url),
-        spokesperson_youtube_url=_blank_to_none(spokesperson_youtube_url),
-    )
-    record = await run_audit(audit_input, settings)
-    save_record(record, _audits_dir())
-    return RedirectResponse(url=f"/audits/{record.audit_id}", status_code=303)
+    try:
+        audit_input = AuditInput(
+            company_name=company_name.strip(),
+            website_url=website_url.strip(),
+            company_linkedin_url=_blank_to_none(company_linkedin_url),
+            company_substack_url=_blank_to_none(company_substack_url),
+            company_medium_url=_blank_to_none(company_medium_url),
+            company_youtube_url=_blank_to_none(company_youtube_url),
+            spokesperson_name=_blank_to_none(spokesperson_name),
+            spokesperson_linkedin_url=_blank_to_none(spokesperson_linkedin_url),
+            spokesperson_substack_url=_blank_to_none(spokesperson_substack_url),
+            spokesperson_medium_url=_blank_to_none(spokesperson_medium_url),
+            spokesperson_youtube_url=_blank_to_none(spokesperson_youtube_url),
+        )
+        record = await run_audit(audit_input, settings)
+        save_record(record, _audits_dir())
+        return RedirectResponse(url=f"/audits/{record.audit_id}", status_code=303)
+    except Exception as exc:
+        return HTMLResponse(
+            content=(
+                "<!doctype html><html><body style=\"font-family: sans-serif; padding: 32px;\">"
+                "<h1>Audit could not be completed</h1>"
+                "<p>The app hit a temporary error while processing the declared channels.</p>"
+                f"<p><strong>Reason:</strong> {str(exc) or 'Unknown error'}</p>"
+                "<p><a href=\"/\">Go back</a></p>"
+                "</body></html>"
+            ),
+            status_code=500,
+        )
 
 
 @app.get("/audits/{audit_id}", response_class=HTMLResponse)

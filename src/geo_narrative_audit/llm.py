@@ -53,19 +53,22 @@ class AuditLLM:
     async def analyze(self, payload: dict) -> dict | None:
         if self._client is None:
             return None
-        message = await self._client.messages.create(
-            model=self.model,
-            temperature=0,
-            max_tokens=1800,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": json.dumps(payload)}],
-        )
-        text = "\n".join(
-            block.text for block in message.content if getattr(block, "type", None) == "text"
-        ).strip()
-        if not text:
+        try:
+            message = await self._client.messages.create(
+                model=self.model,
+                temperature=0,
+                max_tokens=1800,
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": json.dumps(payload)}],
+            )
+            text = "\n".join(
+                block.text for block in message.content if getattr(block, "type", None) == "text"
+            ).strip()
+            if not text:
+                return None
+            return json.loads(_extract_json(text))
+        except Exception:
             return None
-        return json.loads(_extract_json(text))
 
 
 def _extract_json(text: str) -> str:
