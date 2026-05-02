@@ -401,6 +401,10 @@ async def audit_detail(audit_id: str) -> str:
         f"<p><strong>{item['label']}:</strong> {item['message']}</p>"
         for item in geo["channel_snapshots"]
     ) or "<p>No declared channel snapshots were captured beyond the website.</p>"
+    improvement_html = "".join(
+        f"<div style='margin-bottom:18px;'><p style='margin-bottom:6px;'><strong>{item['title']}</strong></p><p style='margin-bottom:6px;'>{item['why']}</p><p style='color:#6c625c;'>{item['impact']}</p></div>"
+        for item in geo["improvement_actions"]
+    ) or "<p>No improvement actions were generated for this run.</p>"
     body = "\n".join(
         [
             section_html(
@@ -441,6 +445,11 @@ async def audit_detail(audit_id: str) -> str:
                 "Diagnosis",
                 f"Overall GEO readiness: {geo['overall_score']:.1f} / 10." if geo["overall_score"] is not None else "Overall GEO readiness score not available.",
                 [geo["diagnosis"], geo["rationale"], f"Best next move: {geo['next_step']}"],
+            ),
+            section_html(
+                "How To Improve GEO Readiness",
+                "Priority actions to raise the score and prepare the brand for later authority building.",
+                [improvement_html],
             ),
         ]
     )

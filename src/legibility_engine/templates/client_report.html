@@ -120,8 +120,12 @@
     {% endfor %}
 
     <section>
-      <h2>Recommended Actions</h2>
-      <p class="recommendation-placeholder">{{ recommendations_placeholder }}</p>
+      <h2>How To Improve GEO Readiness</h2>
+      {% for action in improvement_actions %}
+      <h3>{{ action.title }}</h3>
+      <p>{{ action.why }}</p>
+      <p class="muted">{{ action.impact }}</p>
+      {% endfor %}
     </section>
   </main>
 </body>

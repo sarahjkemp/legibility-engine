@@ -32,7 +32,8 @@ def test_render_existing_sjk_labs_audit_to_html() -> None:
     assert "Spokesperson Alignment" in html
     assert "Content Structure And Proof" in html
     assert "Diagnosis" in html
-    assert "Analyst recommendations to be added before client delivery" in html
+    assert "How To Improve GEO Readiness" in html
+    assert "Build authority only after the narrative is stable" in html
 
 
 def test_report_uses_owned_channel_language_not_old_proxy_chart_language() -> None:
@@ -42,6 +43,7 @@ def test_report_uses_owned_channel_language_not_old_proxy_chart_language() -> No
     assert "Authority Hierarchy" not in html
     assert "Corroboration" not in html
     assert "/ 10" in html
+    assert "How To Improve GEO Readiness" in html
 
 
 def test_pdf_renders_non_empty_bytes() -> None:

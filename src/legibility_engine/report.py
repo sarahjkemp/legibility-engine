@@ -68,7 +68,7 @@ def _build_report_context(record: AuditRecord) -> dict:
         "headline_summary": geo["diagnosis"],
         "coverage_summary": _coverage_summary(record),
         "sections": sections,
-        "recommendations_placeholder": "[Analyst recommendations to be added before client delivery. This section is the human layer on top of the engine output, written based on the findings above and SJK Labs' strategic judgement.]",
+        "improvement_actions": geo["improvement_actions"],
     }
 
 

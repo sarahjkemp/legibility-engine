@@ -27,6 +27,7 @@ def build_geo_summary(record: AuditResult) -> dict:
         "diagnosis": _diagnosis(overall, narrative, website, spokesperson_score, content),
         "rationale": _rationale(record),
         "next_step": _next_step(narrative, website, spokesperson_score, content),
+        "improvement_actions": _improvement_actions(narrative, website, spokesperson_score, content),
     }
 
 
@@ -127,6 +128,50 @@ def _next_step(narrative: float | None, website: float | None, spokesperson: flo
     if weakest == "content":
         return "Add clearer proof, named examples, and stronger claim support across the owned content before expanding outward."
     return "Standardize the core story across the owned channels, then use that stable narrative as the base for authority-building."
+
+
+def _improvement_actions(narrative: float | None, website: float | None, spokesperson: float | None, content: float | None) -> list[dict]:
+    actions: list[dict] = []
+    if narrative is None or narrative < 7:
+        actions.append(
+            {
+                "title": "Unify the core narrative across channels",
+                "why": "AI systems surface brands more cleanly when the same positioning, audience, and offer are repeated across owned surfaces.",
+                "impact": "This is the foundation move. Until the core narrative is consistent, authority-building will amplify confusion rather than clarity.",
+            }
+        )
+    if website is None or website < 7:
+        actions.append(
+            {
+                "title": "Make the website the clear GEO source of truth",
+                "why": "The website is the strongest owned retrieval surface, so unclear structure, weak metadata, or thin attribution make the brand harder to restate accurately.",
+                "impact": "Tightening website structure improves how reliably the brand can be summarized, quoted, and referenced by AI systems.",
+            }
+        )
+    if spokesperson is None or spokesperson < 7:
+        actions.append(
+            {
+                "title": "Align the spokesperson to the company story",
+                "why": "When the founder or spokesperson describes the business differently from the website, AI retrieval gets mixed signals about what the company actually is.",
+                "impact": "Bringing the spokesperson into alignment makes the narrative compound instead of splitting across surfaces.",
+            }
+        )
+    if content is None or content < 7:
+        actions.append(
+            {
+                "title": "Add stronger proof and evidence to the owned content",
+                "why": "Claims are more retrievable and more credible when they are supported by named examples, outcomes, case studies, or other visible evidence.",
+                "impact": "This gives the narrative more weight and makes later authority-building much easier to convert into trust.",
+            }
+        )
+    actions.append(
+        {
+            "title": "Build authority only after the narrative is stable",
+            "why": "Third-party coverage works best once the brand has one clear repeatable story to distribute across PR, partnerships, and external channels.",
+            "impact": "This is the natural upsell path: narrative first, then authority building from a stable base.",
+        }
+    )
+    return actions
 
 
 def _clean_snapshot(text: str) -> str:
