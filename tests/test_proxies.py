@@ -5,7 +5,7 @@ import pytest
 from legibility_engine.config import load_audit_config
 from legibility_engine.entity import assess_entity_match, build_entity_profile
 from legibility_engine.models import AuditTarget
-from legibility_engine.subscore_modules import authority_bodies, authority_tier1, behavioural_complaints, behavioural_reviews, consistency_visual_identity
+from legibility_engine.subscore_modules import authority_bodies, authority_tier1, behavioural_complaints, behavioural_fulfillment, behavioural_reviews, consistency_founder_voice, consistency_visual_identity, consistency_vocabulary_recurrence
 from legibility_engine.collectors.search import (
     dedupe_by_registered_domain,
     filter_to_registered_domain_allowlist,
@@ -202,3 +202,67 @@ async def test_authority_bodies_reject_unverified_results(monkeypatch) -> None:
     result = await authority_bodies.run(target, load_audit_config(), SimpleNamespace())
     assert result.score == 0.0
     assert result.evidence == []
+
+
+@pytest.mark.anyio
+async def test_vocabulary_recurrence_includes_verified_platform_surfaces(monkeypatch) -> None:
+    async def fake_sampled_pages(target, settings, limit: int = 10) -> list[dict]:
+        return [{"url": "https://sjklabs.co", "text": "The legibility gap narrative strategy for the agent era. " * 12}]
+
+    async def fake_platforms(target, settings) -> dict[str, list[dict]]:
+        return {
+            "substack": [{"url": "https://example.substack.com/p/post", "title": "SJK Labs on the legibility gap", "snippet": "Narrative strategy for the agent era"}],
+            "medium": [{"url": "https://medium.com/@sarahkemp/post", "title": "SJK Labs and authority building", "snippet": "The legibility gap appears again"}],
+        }
+
+    monkeypatch.setattr(consistency_vocabulary_recurrence, "sampled_pages", fake_sampled_pages)
+    monkeypatch.setattr(consistency_vocabulary_recurrence, "discover_platform_surfaces", fake_platforms)
+
+    target = AuditTarget(company_name="SJK Labs", primary_url="https://sjklabs.co", audit_type="founder_led", sector="consultancy")
+    result = await consistency_vocabulary_recurrence.run(target, load_audit_config(), SimpleNamespace(anthropic_api_key=None))
+    assert "platform_surfaces" in result.raw_data
+    assert result.raw_data["platform_surfaces"]["substack"][0]["url"].startswith("https://example.substack.com")
+
+
+@pytest.mark.anyio
+async def test_founder_voice_includes_platform_surfaces(monkeypatch) -> None:
+    async def fake_sampled_pages(target, settings, limit: int = 6) -> list[dict]:
+        return [{"url": "https://sjklabs.co", "text": "SJK Labs helps brands with legibility and narrative strategy. " * 8}]
+
+    async def fake_get_text(url: str, settings, cache_namespace: str = "") -> str:
+        return "Sarah Kemp writes about SJK Labs, legibility, and authority."
+
+    async def fake_platforms(target, settings) -> dict[str, list[dict]]:
+        return {"youtube": [{"url": "https://youtube.com/watch?v=123", "title": "Sarah Kemp on SJK Labs", "snippet": "Narrative architecture interview"}]}
+
+    async def fake_search_web(query: str, settings, limit: int = 6) -> list[dict]:
+        return []
+
+    monkeypatch.setattr(consistency_founder_voice, "sampled_pages", fake_sampled_pages)
+    monkeypatch.setattr(consistency_founder_voice, "get_text", fake_get_text)
+    monkeypatch.setattr(consistency_founder_voice, "discover_platform_surfaces", fake_platforms)
+    monkeypatch.setattr(consistency_founder_voice, "search_web", fake_search_web)
+
+    target = AuditTarget(company_name="SJK Labs", primary_url="https://sjklabs.co", audit_type="founder_led", sector="consultancy", founder_name="Sarah Kemp", founder_linkedin_url="https://linkedin.com/in/sarahjkemp")
+    result = await consistency_founder_voice.run(target, load_audit_config(), SimpleNamespace(anthropic_api_key=None))
+    assert "platform_surfaces" in result.raw_data
+    assert any(item.source.startswith("https://youtube.com") for item in result.evidence)
+
+
+@pytest.mark.anyio
+async def test_fulfillment_uses_platform_hosted_owned_surfaces(monkeypatch) -> None:
+    async def fake_fetch_internal_pages(url: str, settings, limit: int = 10) -> list[dict]:
+        return []
+
+    async def fake_platforms(target, settings) -> dict[str, list[dict]]:
+        return {
+            "youtube": [{"url": "https://youtube.com/watch?v=123", "title": "Client growth case study", "snippet": "How SJK Labs helped a client grow"}]
+        }
+
+    monkeypatch.setattr(behavioural_fulfillment, "fetch_internal_pages", fake_fetch_internal_pages)
+    monkeypatch.setattr(behavioural_fulfillment, "discover_platform_surfaces", fake_platforms)
+
+    target = AuditTarget(company_name="SJK Labs", primary_url="https://sjklabs.co", audit_type="founder_led", sector="consultancy")
+    result = await behavioural_fulfillment.run(target, load_audit_config(), SimpleNamespace())
+    assert result.score == 100.0
+    assert any(item.source.startswith("https://youtube.com") for item in result.evidence)

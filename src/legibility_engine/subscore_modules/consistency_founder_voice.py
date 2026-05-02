@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ..collectors.anthropic_client import AnthropicJSONClient
+from ..collectors.platform_surfaces import discover_platform_surfaces
 from ..collectors.search import search_web
 from ..collectors.transport import get_text
 from ..config import AuditConfig, EngineSettings
@@ -31,6 +32,12 @@ async def run(target: AuditTarget, config: AuditConfig, settings: EngineSettings
             founder_text = await get_text(str(target.founder_linkedin_url), settings, cache_namespace="founder_linkedin_pages")
         except Exception:
             founder_text = ""
+    platform_surfaces = await discover_platform_surfaces(target, settings)
+    platform_snippets = "\n".join(
+        (item.get("snippet") or item.get("title") or "")
+        for items in platform_surfaces.values()
+        for item in items[:2]
+    )
     search_hits = await search_web(f'"{target.founder_name or ""}" "{target.company_name}" podcast OR article', settings, limit=6)
     external_snippets = "\n".join((item.get("snippet") or item.get("title") or "") for item in search_hits[:4])
     llm = AnthropicJSONClient(settings)
@@ -41,7 +48,7 @@ async def run(target: AuditTarget, config: AuditConfig, settings: EngineSettings
             payload = {
                 "founder_text": founder_text[:3000],
                 "company_bio": company_bio[:3000],
-                "external_snippets": external_snippets[:2000],
+                "external_snippets": f"{platform_snippets}\n{external_snippets}"[:2000],
             }
             result = await llm.run_prompt(config.prompt_dir / "founder_voice_consistency_v1.md", payload)
             if isinstance(result, dict):
@@ -53,7 +60,9 @@ async def run(target: AuditTarget, config: AuditConfig, settings: EngineSettings
     return SubScoreResult(
         score=score,
         confidence=0.55,
-        evidence=[evidence(str(target.founder_linkedin_url or target.primary_url), (founder_text or company_bio)[:180])] + [evidence(item["url"], item.get("snippet") or item.get("title") or "") for item in search_hits[:3]],
+        evidence=[evidence(str(target.founder_linkedin_url or target.primary_url), (founder_text or company_bio)[:180])]
+        + [evidence(item["url"], item.get("snippet") or item.get("title") or "") for items in platform_surfaces.values() for item in items[:1]]
+        + [evidence(item["url"], item.get("snippet") or item.get("title") or "") for item in search_hits[:3]],
         findings=[SubScoreFinding(severity="medium" if score < 75 else "low", text=rationale)],
-        raw_data={"founder_text_excerpt": founder_text[:1200], "company_bio_excerpt": company_bio[:1200], "search_hits": search_hits, "verdict": verdict},
+        raw_data={"founder_text_excerpt": founder_text[:1200], "company_bio_excerpt": company_bio[:1200], "platform_surfaces": platform_surfaces, "search_hits": search_hits, "verdict": verdict},
     )
