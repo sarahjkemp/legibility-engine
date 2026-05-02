@@ -38,21 +38,27 @@ async def create_audit(
     about_page_url: str = Form(""),
     company_linkedin_url: str = Form(""),
     company_linkedin_post_urls: str = Form(""),
+    company_linkedin_post_texts: list[str] = Form([]),
     company_substack_url: str = Form(""),
     company_substack_article_urls: str = Form(""),
     company_medium_url: str = Form(""),
     company_medium_article_urls: str = Form(""),
+    company_medium_article_texts: list[str] = Form([]),
     company_youtube_url: str = Form(""),
     company_youtube_video_urls: str = Form(""),
+    company_youtube_video_texts: list[str] = Form([]),
     spokesperson_name: str = Form(""),
     spokesperson_linkedin_url: str = Form(""),
     spokesperson_linkedin_post_urls: str = Form(""),
+    spokesperson_linkedin_post_texts: list[str] = Form([]),
     spokesperson_substack_url: str = Form(""),
     spokesperson_substack_article_urls: str = Form(""),
     spokesperson_medium_url: str = Form(""),
     spokesperson_medium_article_urls: str = Form(""),
+    spokesperson_medium_article_texts: list[str] = Form([]),
     spokesperson_youtube_url: str = Form(""),
     spokesperson_youtube_video_urls: str = Form(""),
+    spokesperson_youtube_video_texts: list[str] = Form([]),
 ) -> RedirectResponse:
     try:
         audit_input = AuditInput(
@@ -61,21 +67,27 @@ async def create_audit(
             about_page_url=_blank_to_none(about_page_url),
             company_linkedin_url=_blank_to_none(company_linkedin_url),
             company_linkedin_post_urls=_multi_urls(company_linkedin_post_urls),
+            company_linkedin_post_texts=_clean_text_entries(company_linkedin_post_texts),
             company_substack_url=_blank_to_none(company_substack_url),
             company_substack_article_urls=_multi_urls(company_substack_article_urls),
             company_medium_url=_blank_to_none(company_medium_url),
             company_medium_article_urls=_multi_urls(company_medium_article_urls),
+            company_medium_article_texts=_clean_text_entries(company_medium_article_texts),
             company_youtube_url=_blank_to_none(company_youtube_url),
             company_youtube_video_urls=_multi_urls(company_youtube_video_urls),
+            company_youtube_video_texts=_clean_text_entries(company_youtube_video_texts),
             spokesperson_name=_blank_to_none(spokesperson_name),
             spokesperson_linkedin_url=_blank_to_none(spokesperson_linkedin_url),
             spokesperson_linkedin_post_urls=_multi_urls(spokesperson_linkedin_post_urls),
+            spokesperson_linkedin_post_texts=_clean_text_entries(spokesperson_linkedin_post_texts),
             spokesperson_substack_url=_blank_to_none(spokesperson_substack_url),
             spokesperson_substack_article_urls=_multi_urls(spokesperson_substack_article_urls),
             spokesperson_medium_url=_blank_to_none(spokesperson_medium_url),
             spokesperson_medium_article_urls=_multi_urls(spokesperson_medium_article_urls),
+            spokesperson_medium_article_texts=_clean_text_entries(spokesperson_medium_article_texts),
             spokesperson_youtube_url=_blank_to_none(spokesperson_youtube_url),
             spokesperson_youtube_video_urls=_multi_urls(spokesperson_youtube_video_urls),
+            spokesperson_youtube_video_texts=_clean_text_entries(spokesperson_youtube_video_texts),
         )
         record = await run_audit(audit_input, settings)
         save_record(record, _audits_dir())
@@ -128,3 +140,7 @@ def _blank_to_none(value: str) -> str | None:
 
 def _multi_urls(value: str) -> list[str]:
     return [line.strip() for line in value.splitlines() if line.strip()]
+
+
+def _clean_text_entries(values: list[str]) -> list[str]:
+    return [value.strip() for value in values if value and value.strip()]

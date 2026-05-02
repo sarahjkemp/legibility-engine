@@ -1,4 +1,4 @@
-from geo_narrative_audit.analysis import _fallback_analysis
+from geo_narrative_audit.analysis import _declared_surfaces, _fallback_analysis
 from geo_narrative_audit.models import AuditInput, ChannelSurface
 
 
@@ -56,3 +56,16 @@ def test_fallback_analysis_returns_world_class_shape() -> None:
     assert result["what_to_fix_first"][0].title
     assert "SJK Labs helps businesses strengthen narrative clarity and AI discoverability." in result["what_to_fix_first"][0].what_to_do
     assert result["narrative_consistency"] < 10
+
+
+def test_declared_surfaces_prefers_pasted_platform_text() -> None:
+    audit_input = AuditInput(
+        company_name="SJK Labs",
+        website_url="https://sjklabs.co",
+        company_youtube_video_urls=["https://youtube.com/watch?v=123"],
+        company_youtube_video_texts=["This video explains how SJK Labs approaches authority building for AI retrieval."],
+    )
+    surfaces = _declared_surfaces(audit_input)
+    youtube_content = next(surface for surface in surfaces if surface[0] == "company_youtube_content_1")
+    assert youtube_content[5] == "https://youtube.com/watch?v=123"
+    assert youtube_content[6] == "This video explains how SJK Labs approaches authority building for AI retrieval."

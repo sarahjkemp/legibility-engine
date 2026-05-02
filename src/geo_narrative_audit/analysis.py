@@ -35,7 +35,30 @@ async def run_audit(audit_input: AuditInput, settings: AppSettings) -> AuditReco
 async def _collect_channels(audit_input: AuditInput, settings: AppSettings) -> list[ChannelSurface]:
     channels: list[ChannelSurface] = []
     declared = _declared_surfaces(audit_input)
-    for key, label, role, platform, surface_type, url in declared:
+    for key, label, role, platform, surface_type, url, source_text in declared:
+        if source_text:
+            cleaned = " ".join(source_text.split())
+            message = first_meaningful_sentence(cleaned) or cleaned[:260]
+            channels.append(
+                ChannelSurface(
+                    key=key,
+                    label=label,
+                    role=role,
+                    platform=platform,
+                    url=url,
+                    surface_type=surface_type,
+                    fetched=True,
+                    blocked=False,
+                    blocked_reason=None,
+                    message=message,
+                    raw_excerpt=cleaned[:1200],
+                    title=None,
+                    meta_description=None,
+                    word_count=len(cleaned.split()),
+                )
+            )
+            continue
+
         page = await fetch_page_snapshot(url, settings)
         blocked = not bool(page["text"])
         message = first_meaningful_sentence(page["excerpt"] or page["text"])
@@ -396,22 +419,94 @@ def _action_items(
     return items[:4]
 
 
-def _declared_surfaces(audit_input: AuditInput) -> list[tuple[str, str, str, str, str, str]]:
-    surfaces: list[tuple[str, str, str, str, str, str]] = []
-    surfaces.append(("website", "Website", "company", "website", "website", str(audit_input.website_url)))
+def _declared_surfaces(audit_input: AuditInput) -> list[tuple[str, str, str, str, str, str, str | None]]:
+    surfaces: list[tuple[str, str, str, str, str, str, str | None]] = []
+    surfaces.append(("website", "Website", "company", "website", "website", str(audit_input.website_url), None))
     if audit_input.about_page_url:
-        surfaces.append(("about_page", "About Page", "company", "website", "content", str(audit_input.about_page_url)))
+        surfaces.append(("about_page", "About Page", "company", "website", "content", str(audit_input.about_page_url), None))
 
-    surfaces.extend(_platform_surfaces("company", "Company", "linkedin", audit_input.company_linkedin_url, audit_input.company_linkedin_post_urls))
-    surfaces.extend(_platform_surfaces("company", "Company", "substack", audit_input.company_substack_url, audit_input.company_substack_article_urls))
-    surfaces.extend(_platform_surfaces("company", "Company", "medium", audit_input.company_medium_url, audit_input.company_medium_article_urls))
-    surfaces.extend(_platform_surfaces("company", "Company", "youtube", audit_input.company_youtube_url, audit_input.company_youtube_video_urls))
+    surfaces.extend(
+        _platform_surfaces(
+            "company",
+            "Company",
+            "linkedin",
+            audit_input.company_linkedin_url,
+            audit_input.company_linkedin_post_urls,
+            audit_input.company_linkedin_post_texts,
+        )
+    )
+    surfaces.extend(
+        _platform_surfaces(
+            "company",
+            "Company",
+            "substack",
+            audit_input.company_substack_url,
+            audit_input.company_substack_article_urls,
+            [],
+        )
+    )
+    surfaces.extend(
+        _platform_surfaces(
+            "company",
+            "Company",
+            "medium",
+            audit_input.company_medium_url,
+            audit_input.company_medium_article_urls,
+            audit_input.company_medium_article_texts,
+        )
+    )
+    surfaces.extend(
+        _platform_surfaces(
+            "company",
+            "Company",
+            "youtube",
+            audit_input.company_youtube_url,
+            audit_input.company_youtube_video_urls,
+            audit_input.company_youtube_video_texts,
+        )
+    )
 
     spokesperson = audit_input.spokesperson_name or "Spokesperson"
-    surfaces.extend(_platform_surfaces("spokesperson", spokesperson, "linkedin", audit_input.spokesperson_linkedin_url, audit_input.spokesperson_linkedin_post_urls))
-    surfaces.extend(_platform_surfaces("spokesperson", spokesperson, "substack", audit_input.spokesperson_substack_url, audit_input.spokesperson_substack_article_urls))
-    surfaces.extend(_platform_surfaces("spokesperson", spokesperson, "medium", audit_input.spokesperson_medium_url, audit_input.spokesperson_medium_article_urls))
-    surfaces.extend(_platform_surfaces("spokesperson", spokesperson, "youtube", audit_input.spokesperson_youtube_url, audit_input.spokesperson_youtube_video_urls))
+    surfaces.extend(
+        _platform_surfaces(
+            "spokesperson",
+            spokesperson,
+            "linkedin",
+            audit_input.spokesperson_linkedin_url,
+            audit_input.spokesperson_linkedin_post_urls,
+            audit_input.spokesperson_linkedin_post_texts,
+        )
+    )
+    surfaces.extend(
+        _platform_surfaces(
+            "spokesperson",
+            spokesperson,
+            "substack",
+            audit_input.spokesperson_substack_url,
+            audit_input.spokesperson_substack_article_urls,
+            [],
+        )
+    )
+    surfaces.extend(
+        _platform_surfaces(
+            "spokesperson",
+            spokesperson,
+            "medium",
+            audit_input.spokesperson_medium_url,
+            audit_input.spokesperson_medium_article_urls,
+            audit_input.spokesperson_medium_article_texts,
+        )
+    )
+    surfaces.extend(
+        _platform_surfaces(
+            "spokesperson",
+            spokesperson,
+            "youtube",
+            audit_input.spokesperson_youtube_url,
+            audit_input.spokesperson_youtube_video_urls,
+            audit_input.spokesperson_youtube_video_texts,
+        )
+    )
     return surfaces
 
 
@@ -421,8 +516,9 @@ def _platform_surfaces(
     platform: str,
     profile_url: object,
     content_urls: list[object],
-) -> list[tuple[str, str, str, str, str, str]]:
-    surfaces: list[tuple[str, str, str, str, str, str]] = []
+    content_texts: list[str],
+) -> list[tuple[str, str, str, str, str, str, str | None]]:
+    surfaces: list[tuple[str, str, str, str, str, str, str | None]] = []
     if profile_url:
         surfaces.append(
             (
@@ -432,9 +528,13 @@ def _platform_surfaces(
                 platform,
                 "profile",
                 str(profile_url),
+                None,
             )
         )
-    for index, url in enumerate(content_urls[:3], start=1):
+    max_items = max(len(content_urls), len(content_texts))
+    for index in range(1, min(max_items, 3) + 1):
+        url = str(content_urls[index - 1]) if index - 1 < len(content_urls) else f"manual://{role}/{platform}/{index}"
+        source_text = content_texts[index - 1] if index - 1 < len(content_texts) else None
         surfaces.append(
             (
                 f"{role}_{platform}_content_{index}",
@@ -442,7 +542,8 @@ def _platform_surfaces(
                 role,
                 platform,
                 "content",
-                str(url),
+                url,
+                source_text,
             )
         )
     return surfaces

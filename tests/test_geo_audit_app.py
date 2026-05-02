@@ -12,5 +12,7 @@ def test_dashboard_uses_geo_language() -> None:
     assert "Declare the channels" in html
     assert "Representative company content" in html
     assert "One exact article URL per line" in html
+    assert "YouTube AI summaries or transcript excerpts" in html
+    assert "pasted text or AI summaries are even better" in html
     assert "Legibility Engine" not in html
     assert "Authority Hierarchy" not in html

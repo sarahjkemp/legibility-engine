@@ -264,7 +264,7 @@
     <div class="grid">
       <section class="panel form-panel">
         <h2>Declare the channels</h2>
-        <p class="section-copy">Supply the core profile URLs if you want them assessed, but for the strongest readout, add exact article, post, or video URLs that actually carry the narrative. Those are far more reliable than generic profile pages.</p>
+        <p class="section-copy">Supply the core profile URLs if you want them assessed, but for the strongest readout, add exact article, post, or video URLs that actually carry the narrative. For LinkedIn, Medium, and YouTube, you can also paste the actual post text or AI summary directly. The pasted text will be trusted more than flaky platform scraping.</p>
         <form method="post" action="/audits" id="audit-form">
           <div class="field-grid">
             <label class="full">Company name
@@ -299,14 +299,29 @@
             <label class="full">LinkedIn posts
               <textarea name="company_linkedin_post_urls" placeholder="One exact post URL per line"></textarea>
             </label>
+            <label class="full">LinkedIn post text or pasted summaries
+              <textarea name="company_linkedin_post_texts" placeholder="Paste company LinkedIn post 1"></textarea>
+              <textarea name="company_linkedin_post_texts" placeholder="Paste company LinkedIn post 2"></textarea>
+              <textarea name="company_linkedin_post_texts" placeholder="Paste company LinkedIn post 3"></textarea>
+            </label>
             <label class="full">Substack articles
               <textarea name="company_substack_article_urls" placeholder="One exact article URL per line"></textarea>
             </label>
             <label class="full">Medium articles
               <textarea name="company_medium_article_urls" placeholder="One exact article URL per line"></textarea>
             </label>
+            <label class="full">Medium article text or pasted summaries
+              <textarea name="company_medium_article_texts" placeholder="Paste company Medium article 1"></textarea>
+              <textarea name="company_medium_article_texts" placeholder="Paste company Medium article 2"></textarea>
+              <textarea name="company_medium_article_texts" placeholder="Paste company Medium article 3"></textarea>
+            </label>
             <label class="full">YouTube videos
               <textarea name="company_youtube_video_urls" placeholder="One exact video URL per line"></textarea>
+            </label>
+            <label class="full">YouTube AI summaries or transcript excerpts
+              <textarea name="company_youtube_video_texts" placeholder="Paste company YouTube summary or transcript 1"></textarea>
+              <textarea name="company_youtube_video_texts" placeholder="Paste company YouTube summary or transcript 2"></textarea>
+              <textarea name="company_youtube_video_texts" placeholder="Paste company YouTube summary or transcript 3"></textarea>
             </label>
           </div>
 
@@ -334,14 +349,29 @@
             <label class="full">LinkedIn posts
               <textarea name="spokesperson_linkedin_post_urls" placeholder="One exact post URL per line"></textarea>
             </label>
+            <label class="full">LinkedIn post text or pasted summaries
+              <textarea name="spokesperson_linkedin_post_texts" placeholder="Paste spokesperson LinkedIn post 1"></textarea>
+              <textarea name="spokesperson_linkedin_post_texts" placeholder="Paste spokesperson LinkedIn post 2"></textarea>
+              <textarea name="spokesperson_linkedin_post_texts" placeholder="Paste spokesperson LinkedIn post 3"></textarea>
+            </label>
             <label class="full">Substack articles
               <textarea name="spokesperson_substack_article_urls" placeholder="One exact article URL per line"></textarea>
             </label>
             <label class="full">Medium articles
               <textarea name="spokesperson_medium_article_urls" placeholder="One exact article URL per line"></textarea>
             </label>
+            <label class="full">Medium article text or pasted summaries
+              <textarea name="spokesperson_medium_article_texts" placeholder="Paste spokesperson Medium article 1"></textarea>
+              <textarea name="spokesperson_medium_article_texts" placeholder="Paste spokesperson Medium article 2"></textarea>
+              <textarea name="spokesperson_medium_article_texts" placeholder="Paste spokesperson Medium article 3"></textarea>
+            </label>
             <label class="full">YouTube videos
               <textarea name="spokesperson_youtube_video_urls" placeholder="One exact video URL per line"></textarea>
+            </label>
+            <label class="full">YouTube AI summaries or transcript excerpts
+              <textarea name="spokesperson_youtube_video_texts" placeholder="Paste spokesperson YouTube summary or transcript 1"></textarea>
+              <textarea name="spokesperson_youtube_video_texts" placeholder="Paste spokesperson YouTube summary or transcript 2"></textarea>
+              <textarea name="spokesperson_youtube_video_texts" placeholder="Paste spokesperson YouTube summary or transcript 3"></textarea>
             </label>
           </div>
 
@@ -352,7 +382,7 @@
               <span>Running audit. Pulling channel content and building the scorecard now.</span>
             </div>
           </div>
-          <p class="micro-note">Best results come from supplying the website plus a few exact article, post, or video URLs that represent the message you actually want assessed.</p>
+          <p class="micro-note">Best results come from supplying the website plus a few exact article, post, or video URLs that represent the message you actually want assessed. For LinkedIn, Medium, and YouTube, pasted text or AI summaries are even better.</p>
         </form>
       </section>
 
