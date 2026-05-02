@@ -192,7 +192,7 @@ async def dashboard() -> str:
 
     async function runAudit() {{
       const competitorUrls = document.getElementById('competitor_urls').value
-        .split(/[\n,]/)
+        .split(/[\\n,]/)
         .map(item => item.trim())
         .filter(Boolean)
         .slice(0, 3);
