@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Legibility Audit — {{ company_name }}</title>
+  <title>GEO Narrative Audit — {{ company_name }}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@600;700&display=swap');
     @page { size: A4; margin: 22mm 20mm 24mm; }
@@ -47,12 +47,13 @@
       letter-spacing: -0.01em;
       margin: 0 0 0.4em;
     }
-    h1 { font-size: 3.7rem; line-height: 0.95; }
-    h2 { font-size: 2.1rem; line-height: 1.05; margin-bottom: 0.7em; }
-    h3 { font-size: 1.25rem; line-height: 1.2; margin: 1.3em 0 0.35em; }
+    h1 { font-size: 3.6rem; line-height: 0.95; }
+    h2 { font-size: 2rem; line-height: 1.05; margin-bottom: 0.7em; }
+    h3 { font-size: 1.15rem; line-height: 1.2; margin: 1.3em 0 0.35em; }
     p { margin: 0 0 1em; }
-    .cover-meta {
-      font-size: 1rem;
+    ul { margin: 0.6em 0 1.2em 1.2em; padding: 0; }
+    li { margin-bottom: 0.35em; }
+    .cover-meta, .section-kicker, .muted {
       color: var(--muted);
     }
     .cover-footer {
@@ -67,41 +68,13 @@
       font-size: 0.78rem;
       margin-bottom: 1.6rem;
     }
-    .headline-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 2rem;
-      align-items: end;
-      margin-bottom: 2rem;
+    .summary {
+      font-size: 1.05rem;
     }
-    .metric-label {
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      font-size: 0.74rem;
-      margin-bottom: 0.55rem;
-    }
-    .metric-value {
-      color: var(--green);
-      font-family: 'Playfair Display', Georgia, serif;
-      font-size: 3rem;
-      line-height: 0.95;
-    }
-    .metric-gap {
-      font-size: 4.5rem;
-    }
-    .caption {
-      color: var(--muted);
-      font-size: 0.92rem;
-      margin-top: 1rem;
-    }
-    .proxy-block {
-      margin-bottom: 2rem;
-    }
-    .proxy-score {
+    .section-summary {
       color: var(--green);
       font-weight: 600;
-      margin-bottom: 0.7rem;
+      margin-bottom: 1rem;
     }
     .recommendation-placeholder {
       color: var(--muted);
@@ -113,71 +86,38 @@
   <main class="report">
     <section>
       <div>
-        <div class="eyebrow">Legibility Audit</div>
+        <div class="eyebrow">GEO Narrative Audit</div>
         <h1>{{ company_name }}</h1>
-        <p class="cover-meta">{{ audit_type_human }}</p>
         <p class="cover-meta">{{ report_date }}</p>
       </div>
       <div class="cover-footer">SJK Labs — Narrative strategy for the agent era</div>
     </section>
 
     <section>
-      <h2>Headline</h2>
-      <div class="headline-grid">
-        <div>
-          <div class="metric-label">Composite</div>
-          <div class="metric-value">{{ record.scores.composite|round(0)|int if record.scores.composite is not none else "N/A" }}</div>
-        </div>
-        <div>
-          <div class="metric-label">Benchmark</div>
-          <div class="metric-value">{{ record.scores.benchmark|round(0)|int }}</div>
-        </div>
-        <div>
-          <div class="metric-label">Gap</div>
-          <div class="metric-value metric-gap">{{ record.scores.gap|round(0)|int if record.scores.gap is not none else "N/A" }}</div>
-        </div>
-      </div>
-      <p>{{ headline_summary }}</p>
+      <h2>Audit Summary</h2>
+      <p class="summary">{{ headline_summary }}</p>
+      <p class="muted">{{ coverage_summary }}</p>
     </section>
 
     <section>
-      <h2>Proxy Benchmark Chart</h2>
-      {{ chart_svg | safe }}
-      <p class="caption">Each proxy scored against the benchmark for {{ audit_type_human }} brands.</p>
-    </section>
-
-    <section>
-      <h2>Gap / Asset / Window</h2>
-      <h3>The Gap</h3>
-      {% for paragraph in three_frames.gap %}
-      <p>{{ paragraph }}</p>
-      {% endfor %}
-
-      <h3>The Asset</h3>
-      {% for paragraph in three_frames.asset %}
-      <p>{{ paragraph }}</p>
-      {% endfor %}
-
-      <h3>The Window</h3>
-      {% for paragraph in three_frames.window %}
-      <p>{{ paragraph }}</p>
-      {% endfor %}
-    </section>
-
-    <section>
-      <h2>Proxy Detail</h2>
-      {% for proxy in proxy_details %}
-      <div class="proxy-block">
-        <h3>{{ proxy.name }}</h3>
-        <p>{{ proxy.definition }}</p>
-        <p class="proxy-score">{{ proxy.score_line }}</p>
-        {% for paragraph in proxy.paragraphs %}
-        <p>{{ paragraph }}</p>
+      <h2>Declared Channels</h2>
+      <p class="muted">This audit only analyzes channels that were explicitly supplied.</p>
+      <ul>
+        {% for channel in channels %}
+        <li><strong>{{ channel.label }}</strong>: {{ channel.url }}</li>
         {% endfor %}
-        <p>{{ proxy.confidence_sentence }}</p>
-      </div>
+      </ul>
+    </section>
+
+    {% for section in sections %}
+    <section>
+      <h2>{{ section.title }}</h2>
+      <p class="section-summary">{{ section.summary }}</p>
+      {% for paragraph in section.paragraphs %}
+      <p>{{ paragraph }}</p>
       {% endfor %}
     </section>
+    {% endfor %}
 
     <section>
       <h2>Recommended Actions</h2>

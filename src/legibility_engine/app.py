@@ -58,6 +58,34 @@ def _format_score(value: float | None, findings: list) -> str:
     return f"Not available — {reason}"
 
 
+def _declared_channel_items(result) -> list[tuple[str, str]]:
+    target = result.target
+    items = [
+        ("Website", str(target.primary_url)),
+        ("Company LinkedIn", str(target.company_linkedin_url) if target.company_linkedin_url else ""),
+        ("Company Substack", str(target.company_substack_url) if target.company_substack_url else ""),
+        ("Company Medium", str(target.company_medium_url) if target.company_medium_url else ""),
+        ("Company YouTube", str(target.company_youtube_url) if target.company_youtube_url else ""),
+        ("Spokesperson", target.spokesperson_name or target.founder_name or ""),
+        ("Spokesperson LinkedIn", str(target.spokesperson_linkedin_url or target.founder_linkedin_url) if (target.spokesperson_linkedin_url or target.founder_linkedin_url) else ""),
+        ("Spokesperson Substack", str(target.spokesperson_substack_url) if target.spokesperson_substack_url else ""),
+        ("Spokesperson Medium", str(target.spokesperson_medium_url) if target.spokesperson_medium_url else ""),
+        ("Spokesperson YouTube", str(target.spokesperson_youtube_url) if target.spokesperson_youtube_url else ""),
+    ]
+    return [(label, value) for label, value in items if value]
+
+
+def _proxy_by_name(result, name: str):
+    return next((proxy for proxy in result.proxy_results if proxy.proxy_name == name), None)
+
+
+def _subscore_by_name(result, proxy_name: str, subscore_name: str):
+    proxy = _proxy_by_name(result, proxy_name)
+    if proxy is None:
+        return None
+    return proxy.sub_score_results.get(subscore_name)
+
+
 @app.get("/", response_class=HTMLResponse)
 async def dashboard() -> str:
     audits = list_audit_results(_audits_dir())[:20]
@@ -351,11 +379,57 @@ async def audit_detail(audit_id: str) -> str:
     result = find_audit_by_id(_audits_dir(), audit_id)
     if not result:
         raise HTTPException(status_code=404, detail="Audit not found")
-    proxy_html = []
+    consistency = _proxy_by_name(result, "consistency")
+    provenance = _proxy_by_name(result, "provenance")
+    behavioural = _proxy_by_name(result, "behavioural_reliability")
+    spokesperson = _subscore_by_name(result, "consistency", "founder_key_voice_consistency")
+
+    def section_html(title: str, summary: str, paragraphs: list[str]) -> str:
+        content = "".join(f"<p>{paragraph}</p>" for paragraph in paragraphs) or "<p>No findings yet.</p>"
+        return (
+            f"<section style='background:#fffaf4;border:1px solid #dccfbe;border-radius:16px;padding:18px;margin:14px 0;'>"
+            f"<h2>{title}</h2>"
+            f"<p style='color:#1f3d2e;font-weight:600;'>{summary}</p>"
+            f"{content}"
+            f"</section>"
+        )
+
+    channel_items = "".join(f"<li><strong>{label}</strong>: {value}</li>" for label, value in _declared_channel_items(result))
+    body = "\n".join(
+        [
+            section_html(
+                "Declared Channels",
+                "This audit analyzes only the channels explicitly supplied.",
+                [f"<ul>{channel_items}</ul>"] if channel_items else ["No channels were declared beyond the website."],
+            ),
+            section_html(
+                "Narrative Coherence",
+                f"Current consistency score: {_format_score(consistency.score if consistency else None, consistency.findings if consistency else [])}.",
+                [f"{item.headline}. {item.detail}" for item in (consistency.findings if consistency else [])]
+                or ["The current run did not produce enough material for a strong narrative-coherence judgment."],
+            ),
+            section_html(
+                "Website GEO Readiness",
+                f"Current website readiness score: {_format_score(provenance.score if provenance else None, provenance.findings if provenance else [])}.",
+                [f"{item.headline}. {item.detail}" for item in (provenance.findings if provenance else [])]
+                or ["The website could not yet be assessed in enough depth to produce a strong GEO-readiness judgment."],
+            ),
+            section_html(
+                "Spokesperson Alignment",
+                f"Current spokesperson alignment score: {_format_score(spokesperson.score if spokesperson else None, spokesperson.findings if spokesperson else [])}.",
+                [item.text for item in (spokesperson.findings if spokesperson else [])]
+                or ["No spokesperson channel was supplied, so spokesperson alignment could not yet be assessed."],
+            ),
+            section_html(
+                "Content Structure And Proof",
+                f"Current content-proof score: {_format_score(behavioural.score if behavioural else None, behavioural.findings if behavioural else [])}.",
+                [f"{item.headline}. {item.detail}" for item in (behavioural.findings if behavioural else [])]
+                or ["The current run did not surface enough owned-content proof material to assess claim support cleanly."],
+            ),
+        ]
+    )
+    technical_sections = []
     for proxy in result.proxy_results:
-        findings = "".join(
-            f"<li><strong>{item.severity}</strong>: {item.headline} — {item.detail}</li>" for item in proxy.findings
-        ) or "<li>No findings</li>"
         sub_sections = []
         for name, sub_result in proxy.sub_score_results.items():
             evidence_html = "".join(
@@ -375,16 +449,13 @@ async def audit_detail(audit_id: str) -> str:
                 f"<details style='margin-top:10px;'><summary>View raw data</summary><pre style='white-space:pre-wrap;overflow:auto;background:#fffaf4;padding:12px;border-radius:10px;'>{raw_json}</pre></details>"
                 f"</div></details>"
             )
-        subs = "".join(sub_sections) or "<p>No sub-scores recorded.</p>"
-        proxy_html.append(
-            f"<section style='background:#fffaf4;border:1px solid #dccfbe;border-radius:16px;padding:18px;margin:14px 0;'>"
-            f"<h2>{_labelize(proxy.proxy_name)}</h2>"
-            f"<p><strong>Score:</strong> {_format_score(proxy.score, proxy.findings)} | <strong>Confidence:</strong> {proxy.confidence}</p>"
-            f"<h3>Findings</h3><ul>{findings}</ul>"
-            f"<h3>Sub-scores</h3>{subs}"
-            f"</section>"
+        technical_sections.append(
+            f"<details style='background:#fffaf4;border:1px solid #dccfbe;border-radius:16px;padding:18px;margin:14px 0;'>"
+            f"<summary><strong>{_labelize(proxy.proxy_name)}</strong> technical detail</summary>"
+            f"{''.join(sub_sections) or '<p>No sub-scores recorded.</p>'}"
+            f"</details>"
         )
-    body = "\n".join(proxy_html)
+    technical_html = "\n".join(technical_sections)
     confidence_notice = (
         f"<p style='color:#6c625c;'><strong>Audit run with {int(round(result.scores.confidence * 100))}% confidence</strong> — some signal sources were unavailable.</p>"
         if result.scores.confidence < 0.8
@@ -409,7 +480,7 @@ async def audit_detail(audit_id: str) -> str:
   <main>
     <p><a href="/">← Back</a></p>
     <h1>{result.target.company_name}</h1>
-    <p>Composite: <strong>{result.scores.composite}</strong> | Benchmark: <strong title="Working benchmark. Will be re-validated as more audits are run.">{result.scores.benchmark}</strong> | Gap: <strong>{result.scores.gap}</strong></p>
+    <p>Owned-channel GEO Narrative Audit</p>
     {confidence_notice}
     <div class="actions">
       <a href="/audits/{audit_id}/report">View Client Report</a>
@@ -423,6 +494,11 @@ async def audit_detail(audit_id: str) -> str:
       </ul>
     </section>
     {body}
+    <section style='background:#fffaf4;border:1px solid #dccfbe;border-radius:16px;padding:18px;margin:14px 0;'>
+      <h2>Technical Detail</h2>
+      <p>These sections preserve the underlying sub-score evidence for analyst inspection while the product language shifts to the GEO audit framing.</p>
+      {technical_html}
+    </section>
   </main>
 </body>
 </html>

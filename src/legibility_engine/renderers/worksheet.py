@@ -5,45 +5,71 @@ from ..models import AuditResult
 
 def render_markdown_worksheet(result: AuditResult) -> str:
     lines = [
-        f"# {result.target.company_name} Legibility Audit",
+        f"# {result.target.company_name} GEO Narrative Audit",
         "",
-        f"- Audit type: `{result.target.audit_type}`",
         f"- Primary URL: {result.target.primary_url}",
-        f"- Composite score: `{result.scores.composite}`",
-        f"- Benchmark: `{result.scores.benchmark}`",
-        f"- Gap: `{result.scores.gap}`",
+        f"- Audit date: `{result.created_at.isoformat()}`",
         "",
-        "## Source Coverage",
-        f"- Checked: `{result.source_coverage.checked}`",
-        f"- Found: `{result.source_coverage.found}`",
-        f"- Missing: `{result.source_coverage.missing}`",
-        f"- Unavailable: `{result.source_coverage.unavailable}`",
-        "",
-        "### Coverage By Source Class",
+        "## Declared Channels",
     ]
-    for entry in result.source_coverage.by_source_class:
-        lines.append(
-            f"- `{entry.source_class}`: `{entry.status}` ({entry.confidence}) — {entry.detail}"
-        )
 
-    lines.extend([
-        "",
-        "## Proxy Summary",
-    ])
-    for proxy_name, summary in result.scores.by_proxy.items():
-        lines.append(
-            f"- `{proxy_name}`: score `{summary.score}`, benchmark `{summary.benchmark}`, gap `{summary.gap}`, confidence `{summary.confidence}`"
-        )
+    for label, value in _declared_channels(result):
+        if value:
+            lines.append(f"- **{label}:** {value}")
 
-    for proxy in result.proxy_results:
-        lines.extend(["", f"## {proxy.proxy_name}", ""])
-        if proxy.findings:
-            lines.append("### Findings")
-            for finding in proxy.findings:
-                lines.append(f"- [{finding.severity}] {finding.headline}: {finding.detail}")
-        if proxy.sub_scores:
-            lines.append("")
-            lines.append("### Sub-scores")
-            for key, value in proxy.sub_scores.items():
-                lines.append(f"- `{key}`: `{value}`")
+    lines.extend(
+        [
+            "",
+            "## Coverage",
+            f"- Checked: `{result.source_coverage.checked}`",
+            f"- Found: `{result.source_coverage.found}`",
+            f"- Missing: `{result.source_coverage.missing}`",
+            f"- Unavailable: `{result.source_coverage.unavailable}`",
+            "",
+            "## Narrative Coherence",
+        ]
+    )
+    lines.extend(_proxy_section(result, "consistency"))
+    lines.extend(["", "## Website GEO Readiness"])
+    lines.extend(_proxy_section(result, "provenance"))
+    lines.extend(["", "## Content Structure And Proof"])
+    lines.extend(_proxy_section(result, "behavioural_reliability"))
     return "\n".join(lines) + "\n"
+
+
+def _declared_channels(result: AuditResult) -> list[tuple[str, str | None]]:
+    target = result.target
+    return [
+        ("Website", str(target.primary_url)),
+        ("Company LinkedIn", _maybe_str(target.company_linkedin_url)),
+        ("Company Substack", _maybe_str(target.company_substack_url)),
+        ("Company Medium", _maybe_str(target.company_medium_url)),
+        ("Company YouTube", _maybe_str(target.company_youtube_url)),
+        ("Spokesperson", target.spokesperson_name or target.founder_name),
+        ("Spokesperson LinkedIn", _maybe_str(target.spokesperson_linkedin_url or target.founder_linkedin_url)),
+        ("Spokesperson Substack", _maybe_str(target.spokesperson_substack_url)),
+        ("Spokesperson Medium", _maybe_str(target.spokesperson_medium_url)),
+        ("Spokesperson YouTube", _maybe_str(target.spokesperson_youtube_url)),
+    ]
+
+
+def _proxy_section(result: AuditResult, proxy_name: str) -> list[str]:
+    proxy = next((item for item in result.proxy_results if item.proxy_name == proxy_name), None)
+    if proxy is None:
+        return ["- No data available for this section."]
+    lines = [f"- Score: `{proxy.score}`", f"- Confidence: `{proxy.confidence}`", ""]
+    if proxy.findings:
+        lines.append("### Findings")
+        for finding in proxy.findings:
+            lines.append(f"- [{finding.severity}] {finding.headline}: {finding.detail}")
+    if proxy.sub_scores:
+        lines.extend(["", "### Sub-scores"])
+        for key, value in proxy.sub_scores.items():
+            lines.append(f"- `{key}`: `{value}`")
+    return lines
+
+
+def _maybe_str(value: object) -> str | None:
+    if value:
+        return str(value)
+    return None
