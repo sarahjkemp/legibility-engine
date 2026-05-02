@@ -5,7 +5,7 @@ import pytest
 from legibility_engine.config import load_audit_config
 from legibility_engine.entity import assess_entity_match, build_entity_profile
 from legibility_engine.models import AuditTarget
-from legibility_engine.subscore_modules import authority_tier1
+from legibility_engine.subscore_modules import authority_bodies, authority_tier1, behavioural_complaints, behavioural_reviews, consistency_visual_identity
 from legibility_engine.collectors.search import (
     dedupe_by_registered_domain,
     filter_to_registered_domain_allowlist,
@@ -115,3 +115,90 @@ def test_ambiguous_brand_requires_second_signal() -> None:
     )
     assert possible.decision == "possible_match"
     assert verified.decision == "verified_match"
+
+
+@pytest.mark.anyio
+async def test_behavioural_review_evidence_filters_unrelated_hits(monkeypatch) -> None:
+    async def fake_search_web(query: str, settings, limit: int = 2) -> list[dict]:
+        return [
+            {"title": "St. John Knits | Timeless Luxury", "snippet": "", "url": "https://stjohnknits.com/", "domain": "stjohnknits.com", "registered_domain": "stjohnknits.com"},
+            {"title": "Slumberjack | Outdoor Gear", "snippet": "", "url": "https://slumberjack.com/", "domain": "slumberjack.com", "registered_domain": "slumberjack.com"},
+        ]
+
+    async def fake_verify(results: list[dict], profile, settings) -> list[dict]:
+        return []
+
+    monkeypatch.setattr(behavioural_reviews, "search_web", fake_search_web)
+    monkeypatch.setattr(behavioural_reviews, "verify_entity_matches", fake_verify)
+
+    target = AuditTarget(company_name="SJK Labs", primary_url="https://sjklabs.co", audit_type="founder_led", sector="consultancy")
+    result = await behavioural_reviews.run(target, load_audit_config(), SimpleNamespace())
+    assert result.evidence == []
+    assert result.score is None
+
+
+@pytest.mark.anyio
+async def test_behavioural_complaint_evidence_filters_sports_team_hits(monkeypatch) -> None:
+    async def fake_search_web(query: str, settings, limit: int = 3) -> list[dict]:
+        return [
+            {"title": "SJK live score, schedule & player stats", "snippet": "Sofascore", "url": "https://www.sofascore.com/football/team/sjk/22395", "domain": "sofascore.com", "registered_domain": "sofascore.com"},
+        ]
+
+    async def fake_verify(results: list[dict], profile, settings) -> list[dict]:
+        return []
+
+    monkeypatch.setattr(behavioural_complaints, "search_web", fake_search_web)
+    monkeypatch.setattr(behavioural_complaints, "verify_entity_matches", fake_verify)
+
+    target = AuditTarget(company_name="SJK Labs", primary_url="https://sjklabs.co", audit_type="founder_led", sector="consultancy")
+    result = await behavioural_complaints.run(target, load_audit_config(), SimpleNamespace())
+    assert result.evidence == []
+    assert result.raw_data["hits"] == []
+
+
+@pytest.mark.anyio
+async def test_visual_identity_rejects_unverified_linkedin_substitute(monkeypatch) -> None:
+    async def fake_fetch_page(url: str, settings) -> dict:
+        return {
+            "url": url,
+            "metadata": {"og:site_name": "SJK Labs", "title": "SJK Labs | Narrative architecture"},
+            "text": "SJK Labs narrative architecture",
+            "links": [],
+            "structured_data": {},
+        }
+
+    async def fake_search_web(query: str, settings, limit: int = 1) -> list[dict]:
+        return [{"title": "St. John Knits | Timeless Luxury", "snippet": "", "url": "https://stjohnknits.com/", "domain": "stjohnknits.com", "registered_domain": "stjohnknits.com"}]
+
+    async def fake_verify(results: list[dict], profile, settings) -> list[dict]:
+        return []
+
+    monkeypatch.setattr(consistency_visual_identity, "fetch_page", fake_fetch_page)
+    monkeypatch.setattr(consistency_visual_identity, "search_web", fake_search_web)
+    monkeypatch.setattr(consistency_visual_identity, "verify_entity_matches", fake_verify)
+
+    target = AuditTarget(company_name="SJK Labs", primary_url="https://sjklabs.co", audit_type="founder_led", sector="consultancy")
+    result = await consistency_visual_identity.run(target, load_audit_config(), SimpleNamespace())
+    assert len(result.evidence) == 1
+    assert result.score == 30.0
+
+
+@pytest.mark.anyio
+async def test_authority_bodies_reject_unverified_results(monkeypatch) -> None:
+    async def fake_fetch_internal_pages(url: str, settings, limit: int = 4) -> list[dict]:
+        return [{"text": "Member of PRCA and CIPR", "url": url}]
+
+    async def fake_search_web(query: str, settings, limit: int = 3) -> list[dict]:
+        return [{"title": "PRCA unrelated directory", "snippet": "", "url": "https://example.com/prca", "domain": "example.com", "registered_domain": "example.com"}]
+
+    async def fake_verify(results: list[dict], profile, settings) -> list[dict]:
+        return []
+
+    monkeypatch.setattr(authority_bodies, "fetch_internal_pages", fake_fetch_internal_pages)
+    monkeypatch.setattr(authority_bodies, "search_web", fake_search_web)
+    monkeypatch.setattr(authority_bodies, "verify_entity_matches", fake_verify)
+
+    target = AuditTarget(company_name="SJK Labs", primary_url="https://sjklabs.co", audit_type="founder_led", sector="consultancy")
+    result = await authority_bodies.run(target, load_audit_config(), SimpleNamespace())
+    assert result.score == 0.0
+    assert result.evidence == []
