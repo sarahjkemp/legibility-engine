@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Any, Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, model_validator
 
 
 def utcnow() -> datetime:
@@ -15,7 +15,11 @@ class AuditTarget(BaseModel):
     company_name: str
     primary_url: HttpUrl
     audit_type: str = "default"
+    sector: Literal["b2b_saas", "professional_services", "consultancy", "other"] = "other"
     companies_house_id: str | None = None
+    founder_linkedin_url: HttpUrl | None = None
+    founder_name: str | None = None
+    competitor_urls: list[HttpUrl] = Field(default_factory=list)
     social_handles: dict[str, str] = Field(default_factory=dict)
 
 
@@ -49,15 +53,46 @@ class Observation(BaseModel):
     observed_at: datetime = Field(default_factory=utcnow)
 
 
+class SubScoreEvidence(BaseModel):
+    source: str
+    value: str
+    retrieved_at: datetime = Field(default_factory=utcnow)
+
+
+class SubScoreFinding(BaseModel):
+    severity: Literal["low", "medium", "high"]
+    text: str
+
+
+class SubScoreResult(BaseModel):
+    score: float | None = None
+    confidence: float = 0.0
+    evidence: list[SubScoreEvidence] = Field(default_factory=list)
+    findings: list[SubScoreFinding] = Field(default_factory=list)
+    raw_data: dict[str, Any] = Field(default_factory=dict)
+
+
 class ProxyResult(BaseModel):
     proxy_name: str
     score: float | None = None
     sub_scores: dict[str, float | None] = Field(default_factory=dict)
+    sub_score_results: dict[str, SubScoreResult] = Field(default_factory=dict)
     evidence: list[Evidence] = Field(default_factory=list)
     findings: list[Finding] = Field(default_factory=list)
     observations: list[Observation] = Field(default_factory=list)
     raw_data: dict[str, Any] = Field(default_factory=dict)
     confidence: float = 0.0
+
+    @model_validator(mode="after")
+    def sync_sub_scores(self) -> "ProxyResult":
+        if self.sub_score_results and not self.sub_scores:
+            self.sub_scores = {name: result.score for name, result in self.sub_score_results.items()}
+        elif self.sub_scores and not self.sub_score_results:
+            self.sub_score_results = {
+                name: SubScoreResult(score=value, raw_data=self.raw_data.get(name, {}) if isinstance(self.raw_data, dict) else {})
+                for name, value in self.sub_scores.items()
+            }
+        return self
 
 
 class ProxyScoreSummary(BaseModel):
@@ -71,6 +106,7 @@ class ScoreSummary(BaseModel):
     composite: float | None
     benchmark: float
     gap: float | None
+    confidence: float = 0.0
     by_proxy: dict[str, ProxyScoreSummary]
 
 

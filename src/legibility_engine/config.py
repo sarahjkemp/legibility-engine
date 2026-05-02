@@ -11,12 +11,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class EngineSettings(BaseSettings):
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
+    bing_search_api_key: str | None = Field(default=None, alias="BING_SEARCH_API_KEY")
+    openpagerank_api_key: str | None = Field(default=None, alias="OPENPAGERANK_API_KEY")
     timeout_seconds: float = Field(default=20.0, alias="LEGIBILITY_TIMEOUT_SECONDS")
     user_agent: str = Field(
         default="LegibilityEngine/0.1 (+https://sjklabs.co)",
         alias="LEGIBILITY_USER_AGENT",
     )
     audits_dir: str = Field(default="audits", alias="LEGIBILITY_AUDITS_DIR")
+    cache_dir: str = Field(default="audits/cache", alias="LEGIBILITY_CACHE_DIR")
 
     model_config = SettingsConfigDict(
         populate_by_name=True,

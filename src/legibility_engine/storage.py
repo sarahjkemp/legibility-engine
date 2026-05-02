@@ -31,6 +31,17 @@ def save_audit_result(result: AuditResult, output_dir: Path) -> dict[str, Path]:
 
 def load_audit_result(path: Path) -> AuditResult:
     data = json.loads(path.read_text(encoding="utf-8"))
+    target = data.get("target", {})
+    target.setdefault("sector", "other")
+    target.setdefault("founder_linkedin_url", None)
+    target.setdefault("founder_name", None)
+    target.setdefault("competitor_urls", [])
+    data["target"] = target
+    scores = data.get("scores", {})
+    scores.setdefault("confidence", 0.0)
+    data["scores"] = scores
+    for proxy in data.get("proxy_results", []):
+        proxy.setdefault("sub_score_results", {})
     if "source_coverage" not in data:
         partial = AuditResult.model_validate({**data, "source_coverage": {"checked": 0, "found": 0, "missing": 0, "unavailable": 0, "by_source_class": []}})
         coverage = build_coverage_summary(partial.proxy_results)

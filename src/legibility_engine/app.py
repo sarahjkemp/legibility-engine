@@ -5,9 +5,10 @@ from pathlib import Path
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, Response
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl
 
 from .config import EngineSettings, load_audit_config
+from .inputs import infer_founder_name
 from .models import AuditTarget
 from .orchestrator import run_audit
 from .report import render_report
@@ -18,7 +19,11 @@ class CreateAuditRequest(BaseModel):
     company_name: str
     primary_url: HttpUrl
     audit_type: str = "default"
+    sector: str = "other"
     companies_house_id: str | None = None
+    founder_linkedin_url: HttpUrl | None = None
+    founder_name: str | None = None
+    competitor_urls: list[HttpUrl] = Field(default_factory=list)
 
 
 settings = EngineSettings()
@@ -86,8 +91,21 @@ async def dashboard() -> str:
           <option value="consumer_brand">Consumer brand</option>
           <option value="regulated">Regulated</option>
         </select>
+        <label>Sector</label>
+        <select id="sector">
+          <option value="b2b_saas">B2B SaaS</option>
+          <option value="professional_services">Professional services</option>
+          <option value="consultancy">Consultancy</option>
+          <option value="other" selected>Other</option>
+        </select>
         <label>Companies House ID (optional)</label>
         <input id="companies_house_id" placeholder="Optional" />
+        <label>Founder LinkedIn URL (optional)</label>
+        <input id="founder_linkedin_url" placeholder="https://www.linkedin.com/in/..." />
+        <label>Founder name (optional)</label>
+        <input id="founder_name" placeholder="If blank, we infer it from LinkedIn when possible" />
+        <label>Competitor URLs (optional)</label>
+        <textarea id="competitor_urls" placeholder="One per line or comma-separated" style="width:100%;box-sizing:border-box;border-radius:12px;border:1px solid #dccfbe;padding:12px 14px;font:inherit;min-height:92px;"></textarea>
         <button id="run_button" onclick="runAudit()">Run audit</button>
         <div class="status-row">
           <span id="spinner" class="spinner" aria-hidden="true"></span>
@@ -161,11 +179,20 @@ async def dashboard() -> str:
     }}
 
     async function runAudit() {{
+      const competitorUrls = document.getElementById('competitor_urls').value
+        .split(/[\n,]/)
+        .map(item => item.trim())
+        .filter(Boolean)
+        .slice(0, 3);
       const payload = {{
         company_name: document.getElementById('company_name').value,
         primary_url: document.getElementById('primary_url').value,
         audit_type: document.getElementById('audit_type').value,
-        companies_house_id: document.getElementById('companies_house_id').value || null
+        sector: document.getElementById('sector').value,
+        companies_house_id: document.getElementById('companies_house_id').value || null,
+        founder_linkedin_url: document.getElementById('founder_linkedin_url').value || null,
+        founder_name: document.getElementById('founder_name').value || null,
+        competitor_urls: competitorUrls
       }};
       const status = document.getElementById('status');
       setRunningState(true);
@@ -206,7 +233,14 @@ async def create_audit(request: CreateAuditRequest) -> dict:
             company_name=request.company_name,
             primary_url=request.primary_url,
             audit_type=request.audit_type,
+            sector=request.sector,
             companies_house_id=request.companies_house_id,
+            founder_linkedin_url=request.founder_linkedin_url,
+            founder_name=infer_founder_name(
+                str(request.founder_linkedin_url) if request.founder_linkedin_url else None,
+                request.founder_name,
+            ),
+            competitor_urls=request.competitor_urls[:3],
         )
         result = await run_audit(target, config=load_audit_config(), settings=settings)
         paths = save_audit_result(result, _audits_dir())
@@ -273,6 +307,11 @@ async def audit_detail(audit_id: str) -> str:
             f"</section>"
         )
     body = "\n".join(proxy_html)
+    confidence_notice = (
+        f"<p style='color:#6c625c;'><strong>Audit run with {int(round(result.scores.confidence * 100))}% confidence</strong> — some signal sources were unavailable.</p>"
+        if result.scores.confidence < 0.8
+        else ""
+    )
     return f"""
 <!doctype html>
 <html lang="en">
@@ -293,6 +332,7 @@ async def audit_detail(audit_id: str) -> str:
     <p><a href="/">← Back</a></p>
     <h1>{result.target.company_name}</h1>
     <p>Composite: <strong>{result.scores.composite}</strong> | Benchmark: <strong>{result.scores.benchmark}</strong> | Gap: <strong>{result.scores.gap}</strong></p>
+    {confidence_notice}
     <div class="actions">
       <a href="/audits/{audit_id}/report">View Client Report</a>
       <a href="/audits/{audit_id}/report.pdf">Download PDF</a>
