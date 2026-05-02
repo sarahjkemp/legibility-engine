@@ -45,12 +45,52 @@ Free-source integrations being wired in during the `v1-full` upgrade:
 - DuckDuckGo HTML fallback
 - `python-whois`
 
+Required keys for the current free-source stack:
+
+- `ANTHROPIC_API_KEY`
+- `BING_SEARCH_API_KEY` for the Bing Web Search JSON API
+- `OPENPAGERANK_API_KEY` for Open PageRank lookups
+
+Public free sources that do not require keys in this implementation:
+
+- Companies House public search/profile surfaces
+- Wikidata SPARQL endpoint
+- Wayback Machine availability API
+- DuckDuckGo HTML fallback
+- WHOIS lookups
+
 Planned paid upgrade paths are documented in code comments and will later include:
 
 - SerpAPI
 - Ahrefs / Moz / Majestic
 - News API / Mediastack
 - Phantombuster / Proxycurl
+
+## Data source map
+
+Current v1-full sources by dimension:
+
+- `Corroboration`
+  - Bing Web Search / DuckDuckGo HTML for independent mentions
+  - Anthropic for claim extraction and third-party claim matching
+  - Open PageRank for lightweight domain-authority weighting
+  - Companies House, Wikidata, LinkedIn/Crunchbase search presence for register checks
+- `Provenance`
+  - Owned-site crawl for authorship, metadata, and citations
+  - Companies House public surfaces for corporate identity
+  - WHOIS plus HTTPS/SSL checks for domain signals
+- `Consistency`
+  - Wayback Machine availability snapshots
+  - Owned-site crawl plus optional founder LinkedIn fetch
+  - Anthropic for persistence, vocabulary, and founder voice comparison
+- `Authority Hierarchy`
+  - Bing Web Search / DuckDuckGo HTML site-restricted searches against hardcoded tier lists
+  - Open PageRank as a low-confidence inbound citation proxy
+- `Behavioural Reliability`
+  - Public search results for review, complaint, and reputation surfaces
+  - Owned-site crawl for fulfilment proof and claim-to-evidence inspection
+
+The HTTP transport layer caches external `(url, query)` requests for 7 days in `LEGIBILITY_CACHE_DIR` and rate-limits calls to `2 req/sec` per host.
 
 ## Quick start
 

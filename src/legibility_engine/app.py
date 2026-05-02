@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import uvicorn
@@ -32,6 +33,17 @@ app = FastAPI(title="Legibility Engine")
 
 def _audits_dir() -> Path:
     return Path(settings.audits_dir)
+
+
+def _labelize(value: str) -> str:
+    return value.replace("_", " ").title()
+
+
+def _format_score(value: float | None, findings: list) -> str:
+    if value is not None:
+        return str(value)
+    reason = findings[0].text if findings else "source unavailable"
+    return f"Not available — {reason}"
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -296,14 +308,35 @@ async def audit_detail(audit_id: str) -> str:
         raise HTTPException(status_code=404, detail="Audit not found")
     proxy_html = []
     for proxy in result.proxy_results:
-        findings = "".join(f"<li><strong>{item.severity}</strong>: {item.headline} — {item.detail}</li>" for item in proxy.findings) or "<li>No findings</li>"
-        subs = "".join(f"<li>{key}: {value}</li>" for key, value in proxy.sub_scores.items())
+        findings = "".join(
+            f"<li><strong>{item.severity}</strong>: {item.headline} — {item.detail}</li>" for item in proxy.findings
+        ) or "<li>No findings</li>"
+        sub_sections = []
+        for name, sub_result in proxy.sub_score_results.items():
+            evidence_html = "".join(
+                f"<li><a href='{item.source}' target='_blank' rel='noreferrer'>{item.source}</a><br /><span style='color:#6c625c'>{item.value}</span></li>"
+                for item in sub_result.evidence
+            ) or "<li>No evidence captured.</li>"
+            finding_html = "".join(
+                f"<li><strong>{item.severity}</strong>: {item.text}</li>" for item in sub_result.findings
+            ) or "<li>No findings.</li>"
+            raw_json = json.dumps(sub_result.raw_data, indent=2)
+            sub_sections.append(
+                f"<details style='margin:14px 0;padding:12px 14px;background:#f8f1e7;border-radius:12px;'>"
+                f"<summary><strong>{_labelize(name)}</strong> — {_format_score(sub_result.score, sub_result.findings)} "
+                f"(confidence {sub_result.confidence})</summary>"
+                f"<div style='margin-top:10px;'><p><strong>Findings</strong></p><ul>{finding_html}</ul>"
+                f"<p><strong>Evidence</strong></p><ul>{evidence_html}</ul>"
+                f"<details style='margin-top:10px;'><summary>View raw data</summary><pre style='white-space:pre-wrap;overflow:auto;background:#fffaf4;padding:12px;border-radius:10px;'>{raw_json}</pre></details>"
+                f"</div></details>"
+            )
+        subs = "".join(sub_sections) or "<p>No sub-scores recorded.</p>"
         proxy_html.append(
             f"<section style='background:#fffaf4;border:1px solid #dccfbe;border-radius:16px;padding:18px;margin:14px 0;'>"
-            f"<h2>{proxy.proxy_name}</h2>"
-            f"<p><strong>Score:</strong> {proxy.score} | <strong>Confidence:</strong> {proxy.confidence}</p>"
+            f"<h2>{_labelize(proxy.proxy_name)}</h2>"
+            f"<p><strong>Score:</strong> {_format_score(proxy.score, proxy.findings)} | <strong>Confidence:</strong> {proxy.confidence}</p>"
             f"<h3>Findings</h3><ul>{findings}</ul>"
-            f"<h3>Sub-scores</h3><ul>{subs}</ul>"
+            f"<h3>Sub-scores</h3>{subs}"
             f"</section>"
         )
     body = "\n".join(proxy_html)
@@ -331,7 +364,7 @@ async def audit_detail(audit_id: str) -> str:
   <main>
     <p><a href="/">← Back</a></p>
     <h1>{result.target.company_name}</h1>
-    <p>Composite: <strong>{result.scores.composite}</strong> | Benchmark: <strong>{result.scores.benchmark}</strong> | Gap: <strong>{result.scores.gap}</strong></p>
+    <p>Composite: <strong>{result.scores.composite}</strong> | Benchmark: <strong title="Working benchmark. Will be re-validated as more audits are run.">{result.scores.benchmark}</strong> | Gap: <strong>{result.scores.gap}</strong></p>
     {confidence_notice}
     <div class="actions">
       <a href="/audits/{audit_id}/report">View Client Report</a>

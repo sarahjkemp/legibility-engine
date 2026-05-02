@@ -46,3 +46,12 @@ def _convert_findings(sub_score_name: str, items: list[SubScoreFinding]) -> list
         )
         for item in items
     ]
+
+
+def failed_sub_score(name: str, message: str) -> SubScoreResult:
+    return SubScoreResult(
+        score=None,
+        confidence=0.0,
+        findings=[SubScoreFinding(severity="high", text=f"{name.replace('_', ' ').title()} failed: {message}")],
+        raw_data={"error": message},
+    )

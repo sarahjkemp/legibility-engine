@@ -22,7 +22,7 @@ def test_render_existing_sjk_labs_audit_to_html() -> None:
     html = render_report(record, "html")
 
     assert "SJK Labs" in html
-    assert str(int(record.scores.composite or 0)) in html
+    assert str(round(record.scores.composite or 0)) in html
     for proxy_name in [
         "Corroboration",
         "Provenance",
