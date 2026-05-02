@@ -34,6 +34,7 @@ async def fetch_owned_channel_surfaces(target: AuditTarget, settings: EngineSett
                         "url": page["url"],
                         "text": page.get("text", "")[:4000],
                         "title": page.get("metadata", {}).get("title") or "",
+                        "snapshot": _website_snapshot(page),
                         "source": "declared_input",
                     }
                 )
@@ -49,6 +50,7 @@ async def fetch_owned_channel_surfaces(target: AuditTarget, settings: EngineSett
                 "url": channel["url"],
                 "text": text[:4000],
                 "title": "",
+                "snapshot": _channel_snapshot(text),
                 "source": "declared_input",
             }
         )
@@ -60,3 +62,22 @@ def _first_value(*values: object) -> str | None:
         if value:
             return str(value)
     return None
+
+
+def _website_snapshot(page: dict) -> str:
+    metadata = page.get("metadata", {})
+    title = metadata.get("title") or metadata.get("og:title") or ""
+    description = metadata.get("meta_description") or ""
+    if title and description:
+        return f"{title}. {description}"[:320]
+    if title:
+        return title[:240]
+    return _channel_snapshot(page.get("text", ""))
+
+
+def _channel_snapshot(text: str) -> str:
+    compact = " ".join(text.split()).strip()
+    if not compact:
+        return ""
+    sentence = compact.split(". ")[0].strip()
+    return sentence[:320]

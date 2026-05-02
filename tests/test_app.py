@@ -3,7 +3,10 @@ import asyncio
 from legibility_engine.app import dashboard
 
 
-def test_dashboard_contains_valid_split_regex_literal() -> None:
+def test_dashboard_uses_fresh_geo_audit_language() -> None:
     html = asyncio.run(dashboard())
-    assert ".split(/[\\n,]/)" in html
-    assert ".split(/[\n,]/)" not in html.replace("\\n", "")
+    assert "Owned-channel GEO audit" in html
+    assert "Channels To Audit" in html
+    assert "Overall GEO Readiness" not in html
+    assert "Legibility Engine" not in html
+    assert "Competitor URLs" not in html

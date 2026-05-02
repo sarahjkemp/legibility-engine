@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from .coverage import build_coverage_summary
+from .geo_summary import build_geo_summary
 from .models import AuditResult
 from .renderers.worksheet import render_markdown_worksheet
 
@@ -72,14 +73,14 @@ def list_audit_results(output_dir: Path) -> list[dict]:
             result = load_audit_result(path)
         except Exception:
             continue
+        geo = build_geo_summary(result)
         items.append(
             {
                 "audit_id": result.audit_id,
                 "company_name": result.target.company_name,
-                "audit_type": result.target.audit_type,
                 "created_at": result.created_at.isoformat(),
-                "composite": result.scores.composite,
-                "gap": result.scores.gap,
+                "overall_score": geo.get("overall_score"),
+                "diagnosis": geo.get("diagnosis"),
                 "json_path": str(path),
                 "worksheet_path": str(path.with_suffix(".md")),
             }

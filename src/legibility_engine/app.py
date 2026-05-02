@@ -6,7 +6,7 @@ from pathlib import Path
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, Response
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, HttpUrl
 
 from .config import EngineSettings, load_audit_config
 from .geo_summary import build_geo_summary
@@ -20,11 +20,6 @@ from .storage import find_audit_by_id, list_audit_results, save_audit_result
 class CreateAuditRequest(BaseModel):
     company_name: str
     primary_url: HttpUrl
-    audit_type: str = "default"
-    sector: str = "other"
-    companies_house_id: str | None = None
-    founder_linkedin_url: HttpUrl | None = None
-    founder_name: str | None = None
     company_linkedin_url: HttpUrl | None = None
     company_substack_url: HttpUrl | None = None
     company_medium_url: HttpUrl | None = None
@@ -34,14 +29,10 @@ class CreateAuditRequest(BaseModel):
     spokesperson_substack_url: HttpUrl | None = None
     spokesperson_medium_url: HttpUrl | None = None
     spokesperson_youtube_url: HttpUrl | None = None
-    official_substack_url: HttpUrl | None = None
-    official_medium_url: HttpUrl | None = None
-    official_youtube_url: HttpUrl | None = None
-    competitor_urls: list[HttpUrl] = Field(default_factory=list)
 
 
 settings = EngineSettings()
-app = FastAPI(title="Legibility Engine")
+app = FastAPI(title="GEO Narrative Audit")
 
 
 def _audits_dir() -> Path:
@@ -91,27 +82,31 @@ def _subscore_by_name(result, proxy_name: str, subscore_name: str):
 async def dashboard() -> str:
     audits = list_audit_results(_audits_dir())[:20]
     rows = "\n".join(
-        f"<tr><td>{item['company_name']}</td><td>{item['audit_type']}</td><td>{item['composite']}</td><td>{item['gap']}</td><td><a href='/audits/{item['audit_id']}'>Open</a></td></tr>"
+        f"<tr><td>{item['company_name']}</td><td>{item.get('overall_score', 'N/A')}/10</td><td>{item.get('diagnosis', '')}</td><td><a href='/audits/{item['audit_id']}'>Open</a></td></tr>"
         for item in audits
-    ) or "<tr><td colspan='5'>No audits yet.</td></tr>"
+    ) or "<tr><td colspan='4'>No audits yet.</td></tr>"
     return f"""
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Legibility Engine</title>
+  <title>GEO Narrative Audit</title>
   <style>
-    :root {{ --bg:#f5efe6; --ink:#1f1a17; --muted:#6c625c; --panel:#fffaf4; --line:#dccfbe; --accent:#a3472f; }}
-    body {{ font-family: Georgia, 'Times New Roman', serif; background: linear-gradient(180deg, #f7f1e8 0%, #efe4d3 100%); color: var(--ink); margin: 0; }}
-    main {{ max-width: 1080px; margin: 0 auto; padding: 40px 20px 64px; }}
-    h1 {{ font-size: 2.4rem; margin-bottom: 0.2rem; }}
+    :root {{ --bg:#f6f1e7; --ink:#181a19; --muted:#5f655f; --panel:#fffdf9; --line:#d8d2c7; --accent:#1f3d2e; --soft:#e8f0ea; }}
+    body {{ font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: radial-gradient(circle at top, #fffaf3 0%, #f1eadf 52%, #ece3d4 100%); color: var(--ink); margin: 0; }}
+    main {{ max-width: 1180px; margin: 0 auto; padding: 42px 22px 72px; }}
+    h1 {{ font-size: 3.1rem; line-height: 0.95; margin: 0 0 0.4rem; letter-spacing: -0.04em; }}
+    h2 {{ font-size: 1.3rem; margin: 0 0 1rem; letter-spacing: -0.02em; }}
     p {{ color: var(--muted); }}
-    .grid {{ display: grid; grid-template-columns: minmax(320px, 420px) 1fr; gap: 24px; align-items: start; }}
-    .panel {{ background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 20px; box-shadow: 0 14px 40px rgba(75, 47, 24, 0.08); }}
-    label {{ display:block; font-size:0.95rem; margin: 12px 0 6px; }}
-    input, select, button {{ width: 100%; box-sizing: border-box; border-radius: 12px; border: 1px solid var(--line); padding: 12px 14px; font: inherit; }}
-    button {{ background: var(--accent); color: white; border: none; margin-top: 16px; cursor: pointer; transition: opacity 0.2s ease; }}
+    .intro {{ max-width: 780px; margin-bottom: 28px; }}
+    .grid {{ display: grid; grid-template-columns: minmax(360px, 520px) 1fr; gap: 24px; align-items: start; }}
+    .panel {{ background: rgba(255,253,249,0.88); border: 1px solid var(--line); border-radius: 24px; padding: 24px; box-shadow: 0 18px 50px rgba(58, 43, 27, 0.08); backdrop-filter: blur(8px); }}
+    .subgrid {{ display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }}
+    label {{ display:block; font-size:0.92rem; margin: 12px 0 6px; color:#33433a; font-weight:600; }}
+    input, button, textarea {{ width: 100%; box-sizing: border-box; border-radius: 14px; border: 1px solid var(--line); padding: 13px 14px; font: inherit; background:#fff; }}
+    textarea {{ min-height: 92px; resize: vertical; }}
+    button {{ background: var(--accent); color: white; border: none; margin-top: 18px; cursor: pointer; transition: opacity 0.2s ease; font-weight: 600; }}
     button:hover {{ opacity: 0.94; }}
     button[disabled] {{ opacity: 0.72; cursor: wait; }}
     table {{ width: 100%; border-collapse: collapse; font-size: 0.95rem; }}
@@ -121,58 +116,64 @@ async def dashboard() -> str:
     .status-row {{ display:flex; align-items:center; gap:10px; margin-top:10px; min-height:28px; }}
     .spinner {{ width:18px; height:18px; border-radius:999px; border:2px solid #d8c5b1; border-top-color: var(--accent); animation: spin 0.8s linear infinite; display:none; }}
     .spinner.active {{ display:inline-block; }}
+    .pill {{ display:inline-flex; align-items:center; gap:8px; background:var(--soft); color:var(--accent); border-radius:999px; padding:8px 14px; font-size:0.82rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; }}
+    .note {{ font-size:0.92rem; line-height:1.6; }}
     @keyframes spin {{ from {{ transform: rotate(0deg); }} to {{ transform: rotate(360deg); }} }}
     @media (max-width: 860px) {{ .grid {{ grid-template-columns: 1fr; }} }}
   </style>
 </head>
 <body>
   <main>
-    <h1>GEO Narrative Audit</h1>
-    <p>Private internal runner for auditing owned channels for narrative consistency and retrieval readiness.</p>
+    <div class="intro">
+      <div class="pill">Owned-channel GEO audit</div>
+      <h1>GEO Narrative Audit</h1>
+      <p class="note">Input the exact channels you want reviewed. The audit reads only those declared surfaces, shows what each one is saying, scores overall GEO readiness out of 10, and explains what needs fixing before authority-building is worth doing.</p>
+    </div>
     <div class="grid">
       <section class="panel">
-        <h2>Run Audit</h2>
+        <h2>Channels To Audit</h2>
         <label>Company name</label>
         <input id="company_name" placeholder="SJK Labs" />
         <label>Primary URL</label>
         <input id="primary_url" placeholder="https://sjklabs.co" />
-        <label>Audit type</label>
-        <select id="audit_type">
-          <option value="default">Default</option>
-          <option value="founder_led">Founder-led</option>
-          <option value="b2b_saas">B2B SaaS</option>
-          <option value="consumer_brand">Consumer brand</option>
-          <option value="regulated">Regulated</option>
-        </select>
-        <label>Sector</label>
-        <select id="sector">
-          <option value="b2b_saas">B2B SaaS</option>
-          <option value="professional_services">Professional services</option>
-          <option value="consultancy">Consultancy</option>
-          <option value="other" selected>Other</option>
-        </select>
-        <label>Companies House ID (optional)</label>
-        <input id="companies_house_id" placeholder="Optional" />
-        <label>Company LinkedIn URL (optional)</label>
-        <input id="company_linkedin_url" placeholder="https://www.linkedin.com/company/..." />
-        <label>Company Substack URL (optional)</label>
-        <input id="company_substack_url" placeholder="https://yourpublication.substack.com" />
-        <label>Company Medium URL (optional)</label>
-        <input id="company_medium_url" placeholder="https://medium.com/@company or publication URL" />
-        <label>Company YouTube URL (optional)</label>
-        <input id="company_youtube_url" placeholder="https://www.youtube.com/@company" />
+        <div class="subgrid">
+          <div>
+            <label>Company LinkedIn URL</label>
+            <input id="company_linkedin_url" placeholder="https://www.linkedin.com/company/..." />
+          </div>
+          <div>
+            <label>Company Substack URL</label>
+            <input id="company_substack_url" placeholder="https://yourpublication.substack.com" />
+          </div>
+          <div>
+            <label>Company Medium URL</label>
+            <input id="company_medium_url" placeholder="https://medium.com/@company" />
+          </div>
+          <div>
+            <label>Company YouTube URL</label>
+            <input id="company_youtube_url" placeholder="https://www.youtube.com/@company" />
+          </div>
+        </div>
         <label>Spokesperson name (optional)</label>
         <input id="spokesperson_name" placeholder="Founder or lead spokesperson" />
-        <label>Spokesperson LinkedIn URL (optional)</label>
-        <input id="spokesperson_linkedin_url" placeholder="https://www.linkedin.com/in/..." />
-        <label>Spokesperson Substack URL (optional)</label>
-        <input id="spokesperson_substack_url" placeholder="https://name.substack.com" />
-        <label>Spokesperson Medium URL (optional)</label>
-        <input id="spokesperson_medium_url" placeholder="https://medium.com/@name" />
-        <label>Spokesperson YouTube URL (optional)</label>
-        <input id="spokesperson_youtube_url" placeholder="https://www.youtube.com/@name" />
-        <label>Competitor URLs (optional)</label>
-        <textarea id="competitor_urls" placeholder="One per line or comma-separated" style="width:100%;box-sizing:border-box;border-radius:12px;border:1px solid #dccfbe;padding:12px 14px;font:inherit;min-height:92px;"></textarea>
+        <div class="subgrid">
+          <div>
+            <label>Spokesperson LinkedIn URL</label>
+            <input id="spokesperson_linkedin_url" placeholder="https://www.linkedin.com/in/..." />
+          </div>
+          <div>
+            <label>Spokesperson Substack URL</label>
+            <input id="spokesperson_substack_url" placeholder="https://name.substack.com" />
+          </div>
+          <div>
+            <label>Spokesperson Medium URL</label>
+            <input id="spokesperson_medium_url" placeholder="https://medium.com/@name" />
+          </div>
+          <div>
+            <label>Spokesperson YouTube URL</label>
+            <input id="spokesperson_youtube_url" placeholder="https://www.youtube.com/@name" />
+          </div>
+        </div>
         <button id="run_button" onclick="runAudit()">Run audit</button>
         <div class="status-row">
           <span id="spinner" class="spinner" aria-hidden="true"></span>
@@ -181,9 +182,9 @@ async def dashboard() -> str:
       </section>
       <section class="panel">
         <h2>Recent Audits</h2>
-        <p class="small">Coverage reporting is included in each audit so low evidence coverage is visible, not mistaken for low brand quality.</p>
+        <p class="small">Each audit returns channel messaging, simple GEO readiness scores out of 10, diagnosis, and what to fix before authority-building.</p>
         <table>
-          <thead><tr><th>Company</th><th>Type</th><th>Score</th><th>Gap</th><th></th></tr></thead>
+          <thead><tr><th>Company</th><th>Score</th><th>Diagnosis</th><th></th></tr></thead>
           <tbody>{rows}</tbody>
         </table>
       </section>
@@ -246,17 +247,9 @@ async def dashboard() -> str:
     }}
 
     async function runAudit() {{
-      const competitorUrls = document.getElementById('competitor_urls').value
-        .split(/[\\n,]/)
-        .map(item => item.trim())
-        .filter(Boolean)
-        .slice(0, 3);
       const payload = {{
         company_name: document.getElementById('company_name').value,
         primary_url: document.getElementById('primary_url').value,
-        audit_type: document.getElementById('audit_type').value,
-        sector: document.getElementById('sector').value,
-        companies_house_id: document.getElementById('companies_house_id').value || null,
         company_linkedin_url: document.getElementById('company_linkedin_url').value || null,
         company_substack_url: document.getElementById('company_substack_url').value || null,
         company_medium_url: document.getElementById('company_medium_url').value || null,
@@ -265,8 +258,7 @@ async def dashboard() -> str:
         spokesperson_linkedin_url: document.getElementById('spokesperson_linkedin_url').value || null,
         spokesperson_substack_url: document.getElementById('spokesperson_substack_url').value || null,
         spokesperson_medium_url: document.getElementById('spokesperson_medium_url').value || null,
-        spokesperson_youtube_url: document.getElementById('spokesperson_youtube_url').value || null,
-        competitor_urls: competitorUrls
+        spokesperson_youtube_url: document.getElementById('spokesperson_youtube_url').value || null
       }};
       const status = document.getElementById('status');
       setRunningState(true);
@@ -306,27 +298,25 @@ async def create_audit(request: CreateAuditRequest) -> dict:
         target = AuditTarget(
             company_name=request.company_name,
             primary_url=request.primary_url,
-            audit_type=request.audit_type,
-            sector=request.sector,
-            companies_house_id=request.companies_house_id,
-            founder_linkedin_url=request.spokesperson_linkedin_url or request.founder_linkedin_url,
+            audit_type="founder_led",
+            sector="consultancy",
+            founder_linkedin_url=request.spokesperson_linkedin_url,
             founder_name=infer_founder_name(
-                str(request.spokesperson_linkedin_url or request.founder_linkedin_url) if (request.spokesperson_linkedin_url or request.founder_linkedin_url) else None,
-                request.spokesperson_name or request.founder_name,
+                str(request.spokesperson_linkedin_url) if request.spokesperson_linkedin_url else None,
+                request.spokesperson_name,
             ),
             company_linkedin_url=request.company_linkedin_url,
             company_substack_url=request.company_substack_url,
             company_medium_url=request.company_medium_url,
             company_youtube_url=request.company_youtube_url,
-            spokesperson_name=request.spokesperson_name or request.founder_name,
-            spokesperson_linkedin_url=request.spokesperson_linkedin_url or request.founder_linkedin_url,
+            spokesperson_name=request.spokesperson_name,
+            spokesperson_linkedin_url=request.spokesperson_linkedin_url,
             spokesperson_substack_url=request.spokesperson_substack_url,
             spokesperson_medium_url=request.spokesperson_medium_url,
             spokesperson_youtube_url=request.spokesperson_youtube_url,
-            official_substack_url=request.company_substack_url or request.official_substack_url,
-            official_medium_url=request.company_medium_url or request.official_medium_url,
-            official_youtube_url=request.company_youtube_url or request.official_youtube_url,
-            competitor_urls=request.competitor_urls[:3],
+            official_substack_url=request.company_substack_url,
+            official_medium_url=request.company_medium_url,
+            official_youtube_url=request.company_youtube_url,
         )
         result = await run_audit(target, config=load_audit_config(), settings=settings)
         paths = save_audit_result(result, _audits_dir())

@@ -57,7 +57,7 @@ def _average(values: list[float]) -> float | None:
 def _channel_snapshots(record: AuditResult) -> list[dict]:
     consistency = _proxy(record, "consistency")
     raw = consistency.raw_data if consistency else {}
-    samples = raw.get("channel_snapshots") or []
+    samples = raw.get("vocabulary_recurrence", {}).get("channel_snapshots") or raw.get("channel_snapshots") or []
     snapshots = []
     for item in samples:
         label = f"{item.get('role', '').title()} {item.get('platform', '').title()}".strip()

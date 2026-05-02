@@ -38,7 +38,7 @@ async def run(target: AuditTarget, config: AuditConfig, settings: EngineSettings
             "role": item["role"],
             "platform": item["platform"],
             "url": item["url"],
-            "excerpt": item.get("text", "")[:280],
+            "excerpt": item.get("snapshot") or item.get("text", "")[:280],
         }
         for item in owned_surfaces
     ]
