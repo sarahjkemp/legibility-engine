@@ -19,6 +19,15 @@ class AuditTarget(BaseModel):
     companies_house_id: str | None = None
     founder_linkedin_url: HttpUrl | None = None
     founder_name: str | None = None
+    company_linkedin_url: HttpUrl | None = None
+    company_substack_url: HttpUrl | None = None
+    company_medium_url: HttpUrl | None = None
+    company_youtube_url: HttpUrl | None = None
+    spokesperson_name: str | None = None
+    spokesperson_linkedin_url: HttpUrl | None = None
+    spokesperson_substack_url: HttpUrl | None = None
+    spokesperson_medium_url: HttpUrl | None = None
+    spokesperson_youtube_url: HttpUrl | None = None
     official_substack_url: HttpUrl | None = None
     official_medium_url: HttpUrl | None = None
     official_youtube_url: HttpUrl | None = None

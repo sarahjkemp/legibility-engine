@@ -24,6 +24,15 @@ class CreateAuditRequest(BaseModel):
     companies_house_id: str | None = None
     founder_linkedin_url: HttpUrl | None = None
     founder_name: str | None = None
+    company_linkedin_url: HttpUrl | None = None
+    company_substack_url: HttpUrl | None = None
+    company_medium_url: HttpUrl | None = None
+    company_youtube_url: HttpUrl | None = None
+    spokesperson_name: str | None = None
+    spokesperson_linkedin_url: HttpUrl | None = None
+    spokesperson_substack_url: HttpUrl | None = None
+    spokesperson_medium_url: HttpUrl | None = None
+    spokesperson_youtube_url: HttpUrl | None = None
     official_substack_url: HttpUrl | None = None
     official_medium_url: HttpUrl | None = None
     official_youtube_url: HttpUrl | None = None
@@ -89,8 +98,8 @@ async def dashboard() -> str:
 </head>
 <body>
   <main>
-    <h1>The Legibility Gap Engine</h1>
-    <p>Private internal runner for generating analyst worksheets.</p>
+    <h1>GEO Narrative Audit</h1>
+    <p>Private internal runner for auditing owned channels for narrative consistency and retrieval readiness.</p>
     <div class="grid">
       <section class="panel">
         <h2>Run Audit</h2>
@@ -115,16 +124,24 @@ async def dashboard() -> str:
         </select>
         <label>Companies House ID (optional)</label>
         <input id="companies_house_id" placeholder="Optional" />
-        <label>Founder LinkedIn URL (optional)</label>
-        <input id="founder_linkedin_url" placeholder="https://www.linkedin.com/in/..." />
-        <label>Founder name (optional)</label>
-        <input id="founder_name" placeholder="If blank, we infer it from LinkedIn when possible" />
-        <label>Official Substack URL (optional)</label>
-        <input id="official_substack_url" placeholder="https://yourpublication.substack.com" />
-        <label>Official Medium URL (optional)</label>
-        <input id="official_medium_url" placeholder="https://medium.com/@you or publication URL" />
-        <label>Official YouTube URL (optional)</label>
-        <input id="official_youtube_url" placeholder="https://www.youtube.com/@channel" />
+        <label>Company LinkedIn URL (optional)</label>
+        <input id="company_linkedin_url" placeholder="https://www.linkedin.com/company/..." />
+        <label>Company Substack URL (optional)</label>
+        <input id="company_substack_url" placeholder="https://yourpublication.substack.com" />
+        <label>Company Medium URL (optional)</label>
+        <input id="company_medium_url" placeholder="https://medium.com/@company or publication URL" />
+        <label>Company YouTube URL (optional)</label>
+        <input id="company_youtube_url" placeholder="https://www.youtube.com/@company" />
+        <label>Spokesperson name (optional)</label>
+        <input id="spokesperson_name" placeholder="Founder or lead spokesperson" />
+        <label>Spokesperson LinkedIn URL (optional)</label>
+        <input id="spokesperson_linkedin_url" placeholder="https://www.linkedin.com/in/..." />
+        <label>Spokesperson Substack URL (optional)</label>
+        <input id="spokesperson_substack_url" placeholder="https://name.substack.com" />
+        <label>Spokesperson Medium URL (optional)</label>
+        <input id="spokesperson_medium_url" placeholder="https://medium.com/@name" />
+        <label>Spokesperson YouTube URL (optional)</label>
+        <input id="spokesperson_youtube_url" placeholder="https://www.youtube.com/@name" />
         <label>Competitor URLs (optional)</label>
         <textarea id="competitor_urls" placeholder="One per line or comma-separated" style="width:100%;box-sizing:border-box;border-radius:12px;border:1px solid #dccfbe;padding:12px 14px;font:inherit;min-height:92px;"></textarea>
         <button id="run_button" onclick="runAudit()">Run audit</button>
@@ -211,11 +228,15 @@ async def dashboard() -> str:
         audit_type: document.getElementById('audit_type').value,
         sector: document.getElementById('sector').value,
         companies_house_id: document.getElementById('companies_house_id').value || null,
-        founder_linkedin_url: document.getElementById('founder_linkedin_url').value || null,
-        founder_name: document.getElementById('founder_name').value || null,
-        official_substack_url: document.getElementById('official_substack_url').value || null,
-        official_medium_url: document.getElementById('official_medium_url').value || null,
-        official_youtube_url: document.getElementById('official_youtube_url').value || null,
+        company_linkedin_url: document.getElementById('company_linkedin_url').value || null,
+        company_substack_url: document.getElementById('company_substack_url').value || null,
+        company_medium_url: document.getElementById('company_medium_url').value || null,
+        company_youtube_url: document.getElementById('company_youtube_url').value || null,
+        spokesperson_name: document.getElementById('spokesperson_name').value || null,
+        spokesperson_linkedin_url: document.getElementById('spokesperson_linkedin_url').value || null,
+        spokesperson_substack_url: document.getElementById('spokesperson_substack_url').value || null,
+        spokesperson_medium_url: document.getElementById('spokesperson_medium_url').value || null,
+        spokesperson_youtube_url: document.getElementById('spokesperson_youtube_url').value || null,
         competitor_urls: competitorUrls
       }};
       const status = document.getElementById('status');
@@ -259,14 +280,23 @@ async def create_audit(request: CreateAuditRequest) -> dict:
             audit_type=request.audit_type,
             sector=request.sector,
             companies_house_id=request.companies_house_id,
-            founder_linkedin_url=request.founder_linkedin_url,
+            founder_linkedin_url=request.spokesperson_linkedin_url or request.founder_linkedin_url,
             founder_name=infer_founder_name(
-                str(request.founder_linkedin_url) if request.founder_linkedin_url else None,
-                request.founder_name,
+                str(request.spokesperson_linkedin_url or request.founder_linkedin_url) if (request.spokesperson_linkedin_url or request.founder_linkedin_url) else None,
+                request.spokesperson_name or request.founder_name,
             ),
-            official_substack_url=request.official_substack_url,
-            official_medium_url=request.official_medium_url,
-            official_youtube_url=request.official_youtube_url,
+            company_linkedin_url=request.company_linkedin_url,
+            company_substack_url=request.company_substack_url,
+            company_medium_url=request.company_medium_url,
+            company_youtube_url=request.company_youtube_url,
+            spokesperson_name=request.spokesperson_name or request.founder_name,
+            spokesperson_linkedin_url=request.spokesperson_linkedin_url or request.founder_linkedin_url,
+            spokesperson_substack_url=request.spokesperson_substack_url,
+            spokesperson_medium_url=request.spokesperson_medium_url,
+            spokesperson_youtube_url=request.spokesperson_youtube_url,
+            official_substack_url=request.company_substack_url or request.official_substack_url,
+            official_medium_url=request.company_medium_url or request.official_medium_url,
+            official_youtube_url=request.company_youtube_url or request.official_youtube_url,
             competitor_urls=request.competitor_urls[:3],
         )
         result = await run_audit(target, config=load_audit_config(), settings=settings)

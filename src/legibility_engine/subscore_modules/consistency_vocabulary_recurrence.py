@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from ..collectors.anthropic_client import AnthropicJSONClient
-from ..collectors.platform_surfaces import discover_platform_surfaces
-from ..collectors.transport import get_text
+from ..collectors.owned_channels import fetch_owned_channel_surfaces
 from ..config import AuditConfig, EngineSettings
 from ..models import AuditTarget, SubScoreFinding, SubScoreResult
 from .common import evidence, sampled_pages
@@ -11,17 +10,11 @@ from .common import evidence, sampled_pages
 async def run(target: AuditTarget, config: AuditConfig, settings: EngineSettings) -> SubScoreResult:
     pages = await sampled_pages(target, settings, limit=10)
     surfaces = [{"url": page["url"], "text": page["text"][:2500]} for page in pages[:6]]
-    if target.founder_linkedin_url:
-        try:
-            founder_text = await get_text(str(target.founder_linkedin_url), settings, cache_namespace="founder_linkedin_pages")
-            surfaces.append({"url": str(target.founder_linkedin_url), "text": founder_text[:2500]})
-        except Exception:
-            pass
-    platform_surfaces = await discover_platform_surfaces(target, settings)
-    for items in platform_surfaces.values():
-        for item in items[:2]:
-            snippet = item.get("snippet") or item.get("title") or ""
-            surfaces.append({"url": item["url"], "text": snippet[:2500]})
+    owned_surfaces = await fetch_owned_channel_surfaces(target, settings)
+    for item in owned_surfaces:
+        if item["platform"] == "website":
+            continue
+        surfaces.append({"url": item["url"], "text": item.get("text", "")[:2500]})
     llm = AnthropicJSONClient(settings)
     phrases: list[str] = []
     if llm.available:
@@ -45,5 +38,5 @@ async def run(target: AuditTarget, config: AuditConfig, settings: EngineSettings
         confidence=0.72 if phrases else 0.55,
         evidence=[evidence(surface["url"], surface["text"][:180]) for surface in surfaces[:6]],
         findings=[SubScoreFinding(severity="medium" if score < 50 else "low", text=f"{recurring} of the sampled signature phrases recurred across at least three surfaces.")],
-        raw_data={"surfaces": [surface["url"] for surface in surfaces], "platform_surfaces": platform_surfaces, "phrases": phrases, "phrase_hits": phrase_hits},
+        raw_data={"surfaces": [surface["url"] for surface in surfaces], "owned_channel_surfaces": [item["url"] for item in owned_surfaces], "phrases": phrases, "phrase_hits": phrase_hits},
     )

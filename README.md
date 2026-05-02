@@ -1,98 +1,96 @@
-# Legibility Engine
+# GEO Narrative Audit
 
-Lean v1 engine for The Legibility Gap, now being refactored from `v1-lite` toward a modular `v1-full`.
+Internal audit tool for evaluating whether a brand's **owned channels** are coherent and structured enough for GEO and AI retrieval.
 
-This scaffold is intentionally evidence-first:
+This repo has been intentionally simplified away from broad public-web authority scoring.
+The current product direction is:
 
-- collectors gather raw source material
-- proxies score only from collected evidence
-- LLM use is limited to structured extraction and judgment
-- outputs are analyst-facing, not client-facing
+- the analyst inputs the official channels
+- the tool analyzes only those declared channels
+- the tool checks narrative consistency, spokesperson alignment, and website GEO readiness
+- the output supports a strategy sale:
+  - fix the narrative
+  - align the channels
+  - then build authority later
 
-## What ships in this scaffold
+The working spec for this direction lives in [docs/geo_narrative_audit_spec.md](/Users/sarahkemp/Documents/New%20project/legibility-engine/docs/geo_narrative_audit_spec.md).
 
-- core audit models
-- config-driven scoring and benchmarks
-- modular sub-score architecture
-- file-backed 7-day cache primitives for external lookups
-- provenance proxy with direct site checks
-- lite consistency, corroboration, authority, and behavioural proxies
-- Anthropic wrapper for structured JSON tasks
-- CLI runner that emits audit JSON
-- minimal FastAPI app for private internal use
+## Current Audit Scope
+
+The app now defaults to **owned-surface analysis only**.
+
+Default audit run:
+
+- `Provenance`
+- `Consistency`
+- `Behavioural Reliability`
+  - currently focused on owned-surface proof and claim support
+
+Parked for now:
+
+- `Corroboration`
+- `Authority Hierarchy`
+
+Those modules remain in the codebase, but they are not part of the default audit flow while the product is being reshaped around manual channel inputs.
+
+## Inputs
+
+### Required
+
+- company name
+- primary website URL
+
+### Optional company channels
+
+- company LinkedIn URL
+- company Substack URL
+- company Medium URL
+- company YouTube URL
+
+### Optional spokesperson channels
+
+V1 uses one primary spokesperson profile.
+
+- spokesperson name
+- spokesperson LinkedIn URL
+- spokesperson Substack URL
+- spokesperson Medium URL
+- spokesperson YouTube URL
+
+Legacy founder fields are still present for backward compatibility with older audits.
+
+## What The Tool Pulls From
+
+For the GEO Narrative Audit direction, the tool should analyze only:
+
+- website
+- company LinkedIn
+- company Substack
+- company Medium
+- company YouTube
+- spokesperson LinkedIn
+- spokesperson Substack
+- spokesperson Medium
+- spokesperson YouTube
+
+If a channel is not supplied, the tool should not guess it and should not search for it.
 
 ## Environment
 
-Set any of the following as needed:
+Set what you need:
 
 - `ANTHROPIC_API_KEY`
-- `BING_SEARCH_API_KEY`
-- `OPENPAGERANK_API_KEY`
 - `LEGIBILITY_TIMEOUT_SECONDS`
 - `LEGIBILITY_USER_AGENT`
 - `LEGIBILITY_AUDITS_DIR`
 - `LEGIBILITY_CACHE_DIR`
 
-You can start from `.env.example`.
+Optional legacy keys still supported while the older modules remain in the repo:
 
-Free-source integrations being wired in during the `v1-full` upgrade:
+- `BING_SEARCH_API_KEY`
+- `OPENPAGERANK_API_KEY`
 
-- Companies House Search and Profile API
-- Wikidata SPARQL endpoint
-- Wayback Machine availability API
-- Open PageRank API
-- Bing Web Search
-- DuckDuckGo HTML fallback
-- `python-whois`
-
-Required keys for the current free-source stack:
-
-- `ANTHROPIC_API_KEY`
-- `BING_SEARCH_API_KEY` for the Bing Web Search JSON API
-- `OPENPAGERANK_API_KEY` for Open PageRank lookups
-
-Public free sources that do not require keys in this implementation:
-
-- Companies House public search/profile surfaces
-- Wikidata SPARQL endpoint
-- Wayback Machine availability API
-- DuckDuckGo HTML fallback
-- WHOIS lookups
-
-Planned paid upgrade paths are documented in code comments and will later include:
-
-- SerpAPI
-- Ahrefs / Moz / Majestic
-- News API / Mediastack
-- Phantombuster / Proxycurl
-
-## Data source map
-
-Current v1-full sources by dimension:
-
-- `Corroboration`
-  - Bing Web Search / DuckDuckGo HTML for independent mentions
-  - Anthropic for claim extraction and third-party claim matching
-  - Open PageRank for lightweight domain-authority weighting
-  - Companies House, Wikidata, LinkedIn/Crunchbase search presence for register checks
-- `Provenance`
-  - Owned-site crawl for authorship, metadata, and citations
-  - Companies House public surfaces for corporate identity
-  - WHOIS plus HTTPS/SSL checks for domain signals
-- `Consistency`
-  - Wayback Machine availability snapshots
-  - Owned-site crawl plus optional founder LinkedIn fetch
-  - Anthropic for persistence, vocabulary, and founder voice comparison
-- `Authority Hierarchy`
-  - Bing Web Search / DuckDuckGo HTML site-restricted searches against hardcoded tier lists
-  - Open PageRank as a low-confidence inbound citation proxy
-- `Behavioural Reliability`
-  - Public search results for review, complaint, and reputation surfaces
-  - Owned-site crawl for fulfilment proof and claim-to-evidence inspection
-
-The HTTP transport layer caches external `(url, query)` requests for 7 days in `LEGIBILITY_CACHE_DIR` and rate-limits calls to `2 req/sec` per host.
-
-## Quick start
+## Quick Start
 
 ```bash
 cd /Users/sarahkemp/Documents/New\ project/legibility-engine
@@ -102,16 +100,18 @@ pip install -e .[dev]
 legibility audit "SJK Labs" "https://sjklabs.co" --audit-type founder_led
 ```
 
-Optional richer audit inputs:
+With declared channels:
 
-- `--sector b2b_saas|professional_services|consultancy|other`
-- `--founder-linkedin-url https://www.linkedin.com/in/...`
-- `--founder-name "Founder Name"`
-- `--competitor-urls https://example.com --competitor-urls https://example.org`
+```bash
+legibility audit "SJK Labs" "https://sjklabs.co" \
+  --company-linkedin-url https://www.linkedin.com/company/sjk-labs/ \
+  --company-substack-url https://sjklabs.substack.com \
+  --spokesperson-name "Sarah Kemp" \
+  --spokesperson-linkedin-url https://www.linkedin.com/in/sarahjkemp/ \
+  --spokesperson-medium-url https://medium.com/@sarahkemp
+```
 
-## Private web UI
-
-After installing dependencies:
+## Private Web UI
 
 ```bash
 cd /Users/sarahkemp/Documents/New\ project/legibility-engine
@@ -120,27 +120,11 @@ cd /Users/sarahkemp/Documents/New\ project/legibility-engine
 
 Then open `http://127.0.0.1:8000`.
 
-## Deploy
-
-Private v1 can be deployed as a single FastAPI web service.
-
-- Railway: [railway.json](/Users/sarahkemp/Documents/New%20project/legibility-engine/railway.json) is included.
-- Render: [render.yaml](/Users/sarahkemp/Documents/New%20project/legibility-engine/render.yaml) is included.
-- Generic process managers: [Procfile](/Users/sarahkemp/Documents/New%20project/legibility-engine/Procfile) is included.
-
-Required environment variable:
-
-- `ANTHROPIC_API_KEY`
-
-Optional:
-
-- `LEGIBILITY_TIMEOUT_SECONDS`
-- `LEGIBILITY_USER_AGENT`
-- `LEGIBILITY_AUDITS_DIR`
+The dashboard now includes explicit company and spokesperson channel inputs so the audit can use declared surfaces instead of trying to discover them.
 
 ## Notes
 
-- The target runtime is Python 3.11+, even though this machine currently reports Python 3.9.6.
-- `Companies House` and richer search/news integrations are left as upgrade points.
-- The v1 lite proxies are designed to fail soft and surface confidence clearly.
-- Local verification here is limited because this machine currently lacks `python3.11` and `pytest`.
+- This is an analyst tool, not a client-facing report generator.
+- The website remains the most important GEO surface in the audit.
+- Under-counting is preferable to inventing coherence or authority.
+- Multiple spokesperson profiles are a likely v2 feature; v1 is optimized for a single lead public voice.

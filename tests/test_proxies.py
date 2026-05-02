@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from legibility_engine.config import load_audit_config
+from legibility_engine.collectors import owned_channels
 from legibility_engine.entity import assess_entity_match, build_entity_profile
 from legibility_engine.models import AuditTarget
 from legibility_engine.subscore_modules import authority_bodies, authority_tier1, behavioural_complaints, behavioural_fulfillment, behavioural_reviews, consistency_founder_voice, consistency_visual_identity, consistency_vocabulary_recurrence
@@ -10,7 +11,6 @@ from legibility_engine.collectors.search import (
     dedupe_by_registered_domain,
     filter_to_registered_domain_allowlist,
 )
-from legibility_engine.collectors import platform_surfaces
 
 
 @pytest.mark.anyio
@@ -210,19 +210,19 @@ async def test_vocabulary_recurrence_includes_verified_platform_surfaces(monkeyp
     async def fake_sampled_pages(target, settings, limit: int = 10) -> list[dict]:
         return [{"url": "https://sjklabs.co", "text": "The legibility gap narrative strategy for the agent era. " * 12}]
 
-    async def fake_platforms(target, settings) -> dict[str, list[dict]]:
-        return {
-            "substack": [{"url": "https://example.substack.com/p/post", "title": "SJK Labs on the legibility gap", "snippet": "Narrative strategy for the agent era"}],
-            "medium": [{"url": "https://medium.com/@sarahkemp/post", "title": "SJK Labs and authority building", "snippet": "The legibility gap appears again"}],
-        }
+    async def fake_owned_surfaces(target, settings) -> list[dict]:
+        return [
+            {"role": "company", "platform": "substack", "url": "https://example.substack.com/p/post", "text": "Narrative strategy for the agent era " * 10},
+            {"role": "spokesperson", "platform": "medium", "url": "https://medium.com/@sarahkemp/post", "text": "The legibility gap appears again " * 10},
+        ]
 
     monkeypatch.setattr(consistency_vocabulary_recurrence, "sampled_pages", fake_sampled_pages)
-    monkeypatch.setattr(consistency_vocabulary_recurrence, "discover_platform_surfaces", fake_platforms)
+    monkeypatch.setattr(consistency_vocabulary_recurrence, "fetch_owned_channel_surfaces", fake_owned_surfaces)
 
     target = AuditTarget(company_name="SJK Labs", primary_url="https://sjklabs.co", audit_type="founder_led", sector="consultancy")
     result = await consistency_vocabulary_recurrence.run(target, load_audit_config(), SimpleNamespace(anthropic_api_key=None))
-    assert "platform_surfaces" in result.raw_data
-    assert result.raw_data["platform_surfaces"]["substack"][0]["url"].startswith("https://example.substack.com")
+    assert "owned_channel_surfaces" in result.raw_data
+    assert result.raw_data["owned_channel_surfaces"][0].startswith("https://example.substack.com")
 
 
 @pytest.mark.anyio
@@ -230,23 +230,18 @@ async def test_founder_voice_includes_platform_surfaces(monkeypatch) -> None:
     async def fake_sampled_pages(target, settings, limit: int = 6) -> list[dict]:
         return [{"url": "https://sjklabs.co", "text": "SJK Labs helps brands with legibility and narrative strategy. " * 8}]
 
-    async def fake_get_text(url: str, settings, cache_namespace: str = "") -> str:
-        return "Sarah Kemp writes about SJK Labs, legibility, and authority."
-
-    async def fake_platforms(target, settings) -> dict[str, list[dict]]:
-        return {"youtube": [{"url": "https://youtube.com/watch?v=123", "title": "Sarah Kemp on SJK Labs", "snippet": "Narrative architecture interview"}]}
-
-    async def fake_search_web(query: str, settings, limit: int = 6) -> list[dict]:
-        return []
+    async def fake_owned_surfaces(target, settings) -> list[dict]:
+        return [
+            {"role": "spokesperson", "platform": "linkedin", "url": "https://linkedin.com/in/sarahjkemp", "text": "Sarah Kemp writes about SJK Labs, legibility, and authority."},
+            {"role": "spokesperson", "platform": "youtube", "url": "https://youtube.com/watch?v=123", "text": "Narrative architecture interview about SJK Labs."},
+        ]
 
     monkeypatch.setattr(consistency_founder_voice, "sampled_pages", fake_sampled_pages)
-    monkeypatch.setattr(consistency_founder_voice, "get_text", fake_get_text)
-    monkeypatch.setattr(consistency_founder_voice, "discover_platform_surfaces", fake_platforms)
-    monkeypatch.setattr(consistency_founder_voice, "search_web", fake_search_web)
+    monkeypatch.setattr(consistency_founder_voice, "fetch_owned_channel_surfaces", fake_owned_surfaces)
 
-    target = AuditTarget(company_name="SJK Labs", primary_url="https://sjklabs.co", audit_type="founder_led", sector="consultancy", founder_name="Sarah Kemp", founder_linkedin_url="https://linkedin.com/in/sarahjkemp")
+    target = AuditTarget(company_name="SJK Labs", primary_url="https://sjklabs.co", audit_type="founder_led", sector="consultancy", spokesperson_name="Sarah Kemp", spokesperson_linkedin_url="https://linkedin.com/in/sarahjkemp")
     result = await consistency_founder_voice.run(target, load_audit_config(), SimpleNamespace(anthropic_api_key=None))
-    assert "platform_surfaces" in result.raw_data
+    assert "spokesperson_surfaces" in result.raw_data
     assert any(item.source.startswith("https://youtube.com") for item in result.evidence)
 
 
@@ -255,13 +250,11 @@ async def test_fulfillment_uses_platform_hosted_owned_surfaces(monkeypatch) -> N
     async def fake_fetch_internal_pages(url: str, settings, limit: int = 10) -> list[dict]:
         return []
 
-    async def fake_platforms(target, settings) -> dict[str, list[dict]]:
-        return {
-            "youtube": [{"url": "https://youtube.com/watch?v=123", "title": "Client growth case study", "snippet": "How SJK Labs helped a client grow"}]
-        }
+    async def fake_owned_surfaces(target, settings) -> list[dict]:
+        return [{"role": "spokesperson", "platform": "youtube", "url": "https://youtube.com/watch?v=123", "text": "Client growth case study. How SJK Labs helped a client grow."}]
 
     monkeypatch.setattr(behavioural_fulfillment, "fetch_internal_pages", fake_fetch_internal_pages)
-    monkeypatch.setattr(behavioural_fulfillment, "discover_platform_surfaces", fake_platforms)
+    monkeypatch.setattr(behavioural_fulfillment, "fetch_owned_channel_surfaces", fake_owned_surfaces)
 
     target = AuditTarget(company_name="SJK Labs", primary_url="https://sjklabs.co", audit_type="founder_led", sector="consultancy")
     result = await behavioural_fulfillment.run(target, load_audit_config(), SimpleNamespace())
@@ -270,59 +263,45 @@ async def test_fulfillment_uses_platform_hosted_owned_surfaces(monkeypatch) -> N
 
 
 @pytest.mark.anyio
-async def test_platform_surface_discovery_prefers_explicit_urls(monkeypatch) -> None:
-    seen_queries: list[str] = []
-
-    async def fake_fetch_internal_pages(url: str, settings, limit: int = 6) -> list[dict]:
-        return []
-
-    async def fake_search_web(query: str, settings, limit: int = 4) -> list[dict]:
-        seen_queries.append(query)
-        return []
-
-    monkeypatch.setattr(platform_surfaces, "fetch_internal_pages", fake_fetch_internal_pages)
-    monkeypatch.setattr(platform_surfaces, "search_web", fake_search_web)
-
+async def test_declared_owned_channels_include_company_and_spokesperson_surfaces() -> None:
     target = AuditTarget(
         company_name="SJK Labs",
         primary_url="https://sjklabs.co",
         audit_type="founder_led",
         sector="consultancy",
-        official_substack_url="https://sjklabs.substack.com/p/legibility-gap",
+        company_substack_url="https://sjklabs.substack.com/p/legibility-gap",
+        company_linkedin_url="https://www.linkedin.com/company/sjk-labs/",
+        spokesperson_name="Sarah Kemp",
+        spokesperson_medium_url="https://medium.com/@sarahkemp",
     )
-    result = await platform_surfaces.discover_platform_surfaces(target, SimpleNamespace())
-    assert result["substack"][0]["url"] == "https://sjklabs.substack.com/p/legibility-gap"
-    assert result["substack"][0]["source"] == "explicit_input"
-    assert all("site:substack.com" not in query for query in seen_queries)
+    result = owned_channels.declared_owned_channels(target)
+    urls = {item["url"] for item in result}
+    assert "https://sjklabs.co/" in urls
+    assert "https://sjklabs.substack.com/p/legibility-gap" in urls
+    assert "https://www.linkedin.com/company/sjk-labs/" in urls
+    assert "https://medium.com/@sarahkemp" in urls
 
 
 @pytest.mark.anyio
-async def test_platform_surface_discovery_uses_owned_site_links_before_search(monkeypatch) -> None:
+async def test_fetch_owned_channel_surfaces_uses_declared_inputs(monkeypatch) -> None:
     async def fake_fetch_internal_pages(url: str, settings, limit: int = 6) -> list[dict]:
-        return [
-            {
-                "url": "https://sjklabs.co/about",
-                "links": [
-                    "https://sjklabs.substack.com/about",
-                    "https://www.youtube.com/@sarahjkemp",
-                    "https://medium.com/@sarahjkemp",
-                ],
-            }
-        ]
+        return [{"url": "https://sjklabs.co", "text": "SJK Labs home", "metadata": {"title": "Home"}}]
 
-    async def fake_search_web(query: str, settings, limit: int = 4) -> list[dict]:
-        raise AssertionError("search should not run when owned-site platform links are present")
+    async def fake_get_text(url: str, settings, cache_namespace: str = "") -> str:
+        return f"content for {url}"
 
-    monkeypatch.setattr(platform_surfaces, "fetch_internal_pages", fake_fetch_internal_pages)
-    monkeypatch.setattr(platform_surfaces, "search_web", fake_search_web)
-
+    monkeypatch.setattr(owned_channels, "fetch_internal_pages", fake_fetch_internal_pages)
+    monkeypatch.setattr(owned_channels, "get_text", fake_get_text)
     target = AuditTarget(
         company_name="SJK Labs",
         primary_url="https://sjklabs.co",
         audit_type="founder_led",
         sector="consultancy",
+        company_substack_url="https://sjklabs.substack.com",
+        spokesperson_youtube_url="https://youtube.com/@sarahjkemp",
     )
-    result = await platform_surfaces.discover_platform_surfaces(target, SimpleNamespace())
-    assert result["substack"][0]["source"] == "owned_site_link"
-    assert result["youtube"][0]["url"] == "https://www.youtube.com/@sarahjkemp"
-    assert result["medium"][0]["url"] == "https://medium.com/@sarahjkemp"
+    result = await owned_channels.fetch_owned_channel_surfaces(target, SimpleNamespace())
+    urls = {item["url"] for item in result}
+    assert "https://sjklabs.co" in urls
+    assert "https://sjklabs.substack.com/" in urls
+    assert "https://youtube.com/@sarahjkemp" in urls

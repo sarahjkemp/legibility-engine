@@ -78,6 +78,15 @@ def test_load_audit_result_backfills_new_target_fields(tmp_path: Path) -> None:
 
     assert result.target.sector == "other"
     assert result.target.founder_name is None
+    assert result.target.company_linkedin_url is None
+    assert result.target.company_substack_url is None
+    assert result.target.company_medium_url is None
+    assert result.target.company_youtube_url is None
+    assert result.target.spokesperson_name is None
+    assert result.target.spokesperson_linkedin_url is None
+    assert result.target.spokesperson_substack_url is None
+    assert result.target.spokesperson_medium_url is None
+    assert result.target.spokesperson_youtube_url is None
     assert result.target.official_substack_url is None
     assert result.target.official_medium_url is None
     assert result.target.official_youtube_url is None
