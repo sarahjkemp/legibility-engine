@@ -249,7 +249,7 @@
                 <div class="channel-label">{{ channel.label }}</div>
                 <div class="channel-copy">{{ channel.message }}</div>
                 {% if channel.blocked %}
-                  <p class="muted">This page did not yield enough clean text for a stronger summary, which weakens confidence on this surface.</p>
+                  <p class="muted">{{ channel.blocked_reason or "This page did not yield enough clean text for a stronger summary, which weakens confidence on this surface." }}</p>
                 {% endif %}
               </div>
             {% endfor %}

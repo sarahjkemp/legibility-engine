@@ -31,6 +31,19 @@ def test_fallback_analysis_returns_world_class_shape() -> None:
             raw_excerpt="Sarah Kemp writes about narrative architecture, authority building, and discoverability.",
             word_count=120,
         ),
+        ChannelSurface(
+            key="company_youtube_content_1",
+            label="Company Youtube Content 1",
+            role="company",
+            platform="youtube",
+            url="https://youtube.com/watch?v=123",
+            surface_type="content",
+            fetched=False,
+            blocked=True,
+            blocked_reason="The supplied YouTube URL resolved to generic YouTube platform text rather than video-specific or channel-specific content.",
+            message="The supplied YouTube URL resolved to generic YouTube platform text rather than video-specific or channel-specific content.",
+            word_count=0,
+        ),
     ]
     result = _fallback_analysis(audit_input, channels)
     assert 0 <= result["overall_geo_readiness"] <= 10
@@ -41,3 +54,5 @@ def test_fallback_analysis_returns_world_class_shape() -> None:
     assert result["website_findings"]
     assert result["what_to_fix_first"]
     assert result["what_to_fix_first"][0].title
+    assert "SJK Labs helps businesses strengthen narrative clarity and AI discoverability." in result["what_to_fix_first"][0].what_to_do
+    assert result["narrative_consistency"] < 10

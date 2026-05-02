@@ -39,6 +39,7 @@ class ChannelSurface(BaseModel):
     surface_type: Literal["profile", "content", "website"]
     fetched: bool
     blocked: bool = False
+    blocked_reason: str | None = None
     message: str
     raw_excerpt: str | None = None
     title: str | None = None
