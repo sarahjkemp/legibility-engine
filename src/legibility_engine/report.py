@@ -6,16 +6,10 @@ from typing import Literal
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from .geo_summary import build_geo_summary
 from .models import AuditResult, ProxyResult, SubScoreResult
 
 AuditRecord = AuditResult
-
-SECTION_TITLES = {
-    "narrative_coherence": "Narrative Coherence",
-    "website_readiness": "Website GEO Readiness",
-    "spokesperson_alignment": "Spokesperson Alignment",
-    "content_proof": "Content Structure And Proof",
-}
 
 
 def render_report(record: AuditRecord, format: Literal["html", "pdf"]) -> str | bytes:
@@ -29,28 +23,41 @@ def render_report(record: AuditRecord, format: Literal["html", "pdf"]) -> str | 
 
 
 def _build_report_context(record: AuditRecord) -> dict:
+    geo = build_geo_summary(record)
     channels = _declared_channels(record)
-    summary = _headline_summary(record, channels)
     sections = [
         {
-            "title": "Narrative Coherence",
-            "summary": _consistency_score_line(record),
+            "title": "Channel Messaging",
+            "summary": "What each declared channel is currently saying about the company.",
+            "paragraphs": [
+                f"On {item['label']}, the current messaging emphasizes: {item['message']}."
+                for item in geo["channel_snapshots"]
+            ] or ["No declared channel snapshots were captured beyond the website."],
+        },
+        {
+            "title": "Narrative Consistency",
+            "summary": _score_summary_line("Narrative consistency", geo["narrative_score"]),
             "paragraphs": _narrative_paragraphs(record),
         },
         {
             "title": "Website GEO Readiness",
-            "summary": _website_score_line(record),
+            "summary": _score_summary_line("Website GEO readiness", geo["website_score"]),
             "paragraphs": _website_paragraphs(record),
         },
         {
             "title": "Spokesperson Alignment",
-            "summary": _spokesperson_score_line(record),
+            "summary": _score_summary_line("Spokesperson alignment", geo["spokesperson_score"]),
             "paragraphs": _spokesperson_paragraphs(record),
         },
         {
             "title": "Content Structure And Proof",
-            "summary": _content_score_line(record),
+            "summary": _score_summary_line("Content structure and proof", geo["content_score"]),
             "paragraphs": _content_paragraphs(record),
+        },
+        {
+            "title": "Diagnosis",
+            "summary": _score_summary_line("Overall GEO readiness", geo["overall_score"]),
+            "paragraphs": [geo["diagnosis"], geo["rationale"], f"Best next move: {geo['next_step']}"],
         },
     ]
     return {
@@ -58,7 +65,7 @@ def _build_report_context(record: AuditRecord) -> dict:
         "company_name": record.target.company_name,
         "report_date": _format_date(record.created_at),
         "channels": channels,
-        "headline_summary": summary,
+        "headline_summary": geo["diagnosis"],
         "coverage_summary": _coverage_summary(record),
         "sections": sections,
         "recommendations_placeholder": "[Analyst recommendations to be added before client delivery. This section is the human layer on top of the engine output, written based on the findings above and SJK Labs' strategic judgement.]",
@@ -79,23 +86,6 @@ def _declared_channels(record: AuditRecord) -> list[dict]:
         ("Spokesperson YouTube", _maybe_str(target.spokesperson_youtube_url), "spokesperson"),
     ]
     return [{"label": label, "url": url, "role": role} for label, url, role in raw if url]
-
-
-def _headline_summary(record: AuditRecord, channels: list[dict]) -> str:
-    supplied = len(channels)
-    spokesperson_name = record.target.spokesperson_name or record.target.founder_name or "the spokesperson"
-    has_spokesperson = any(item["role"] == "spokesperson" for item in channels)
-    coverage_line = f"This audit analyzed {supplied} declared owned channels, centered on the website"
-    if has_spokesperson:
-        coverage_line += f" and {spokesperson_name}'s public surfaces"
-    coverage_line += "."
-    consistency = _find_proxy(record, "consistency")
-    provenance = _find_proxy(record, "provenance")
-    behavioural = _find_proxy(record, "behavioural_reliability")
-    narrative = _first_finding_detail(consistency) or "Narrative consistency across channels is still being established."
-    website = _first_finding_detail(provenance) or "The website remains the primary GEO surface and sets the baseline for retrieval clarity."
-    proof = _first_finding_detail(behavioural) or "Public proof and structure on owned surfaces determine how confidently the story compounds."
-    return f"{coverage_line} {narrative} {website} {proof}"
 
 
 def _coverage_summary(record: AuditRecord) -> str:
@@ -140,34 +130,10 @@ def _content_paragraphs(record: AuditRecord) -> list[str]:
     return paragraphs
 
 
-def _consistency_score_line(record: AuditRecord) -> str:
-    proxy = _find_proxy(record, "consistency")
-    return _simple_score_line(proxy, "Measures whether the same core story repeats clearly across the declared channels.")
-
-
-def _website_score_line(record: AuditRecord) -> str:
-    proxy = _find_proxy(record, "provenance")
-    return _simple_score_line(proxy, "Measures how well the website communicates, structures, and attributes information for GEO retrieval.")
-
-
-def _spokesperson_score_line(record: AuditRecord) -> str:
-    subscore = _find_subscore(record, "consistency", "founder_key_voice_consistency")
-    if subscore is None:
-        return "Not yet assessed from a declared spokesperson surface."
-    if subscore.score is None:
-        return "Not yet assessed from a declared spokesperson surface."
-    return f"Current alignment score: {subscore.score:.0f} / 100."
-
-
-def _content_score_line(record: AuditRecord) -> str:
-    proxy = _find_proxy(record, "behavioural_reliability")
-    return _simple_score_line(proxy, "Measures whether the owned content includes visible proof, structure, and evidence to support its claims.")
-
-
-def _simple_score_line(proxy: ProxyResult | None, definition: str) -> str:
-    if proxy is None or proxy.score is None:
-        return f"{definition} Current score not available."
-    return f"{definition} Current score: {proxy.score:.0f} / 100."
+def _score_summary_line(label: str, score: float | None) -> str:
+    if score is None:
+        return f"{label.capitalize()} score not available from the current declared channels."
+    return f"{label.capitalize()}: {score:.1f} / 10."
 
 
 def _find_proxy(record: AuditRecord, name: str) -> ProxyResult | None:
@@ -185,13 +151,6 @@ def _proxy_findings(proxy: ProxyResult | None) -> list[str]:
     if proxy is None:
         return []
     return [f"{item.headline}. {item.detail}" for item in proxy.findings]
-
-
-def _first_finding_detail(proxy: ProxyResult | None) -> str | None:
-    if proxy is None or not proxy.findings:
-        return None
-    first = proxy.findings[0]
-    return f"{first.headline}. {first.detail}"
 
 
 def _template_env() -> Environment:

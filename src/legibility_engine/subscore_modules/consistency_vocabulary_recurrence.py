@@ -33,10 +33,25 @@ async def run(target: AuditTarget, config: AuditConfig, settings: EngineSettings
         if hits >= 3:
             recurring += 1
     score = round((recurring / max(1, min(5, len(phrases[:5])))) * 100, 2)
+    channel_snapshots = [
+        {
+            "role": item["role"],
+            "platform": item["platform"],
+            "url": item["url"],
+            "excerpt": item.get("text", "")[:280],
+        }
+        for item in owned_surfaces
+    ]
     return SubScoreResult(
         score=score,
         confidence=0.72 if phrases else 0.55,
         evidence=[evidence(surface["url"], surface["text"][:180]) for surface in surfaces[:6]],
         findings=[SubScoreFinding(severity="medium" if score < 50 else "low", text=f"{recurring} of the sampled signature phrases recurred across at least three surfaces.")],
-        raw_data={"surfaces": [surface["url"] for surface in surfaces], "owned_channel_surfaces": [item["url"] for item in owned_surfaces], "phrases": phrases, "phrase_hits": phrase_hits},
+        raw_data={
+            "surfaces": [surface["url"] for surface in surfaces],
+            "owned_channel_surfaces": [item["url"] for item in owned_surfaces],
+            "channel_snapshots": channel_snapshots,
+            "phrases": phrases,
+            "phrase_hits": phrase_hits,
+        },
     )

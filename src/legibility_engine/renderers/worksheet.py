@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+from ..geo_summary import build_geo_summary
 from ..models import AuditResult
 
 
 def render_markdown_worksheet(result: AuditResult) -> str:
+    geo = build_geo_summary(result)
     lines = [
         f"# {result.target.company_name} GEO Narrative Audit",
         "",
         f"- Primary URL: {result.target.primary_url}",
         f"- Audit date: `{result.created_at.isoformat()}`",
+        f"- Overall GEO Readiness: `{geo['overall_score']}` / 10",
         "",
         "## Declared Channels",
     ]
@@ -20,6 +23,15 @@ def render_markdown_worksheet(result: AuditResult) -> str:
     lines.extend(
         [
             "",
+            "## Channel Messaging",
+        ]
+    )
+    for item in geo["channel_snapshots"]:
+        lines.append(f"- **{item['label']}:** {item['message']}")
+
+    lines.extend(
+        [
+            "",
             "## Coverage",
             f"- Checked: `{result.source_coverage.checked}`",
             f"- Found: `{result.source_coverage.found}`",
@@ -27,13 +39,14 @@ def render_markdown_worksheet(result: AuditResult) -> str:
             f"- Unavailable: `{result.source_coverage.unavailable}`",
             "",
             "## Narrative Coherence",
+            f"- Score: `{geo['narrative_score']}` / 10",
         ]
     )
-    lines.extend(_proxy_section(result, "consistency"))
-    lines.extend(["", "## Website GEO Readiness"])
-    lines.extend(_proxy_section(result, "provenance"))
-    lines.extend(["", "## Content Structure And Proof"])
-    lines.extend(_proxy_section(result, "behavioural_reliability"))
+    lines.extend(_proxy_findings(result, "consistency"))
+    lines.extend(["", "## Website GEO Readiness", f"- Score: `{geo['website_score']}` / 10"])
+    lines.extend(_proxy_findings(result, "provenance"))
+    lines.extend(["", "## Spokesperson Alignment", f"- Score: `{geo['spokesperson_score']}` / 10", f"- Diagnosis: {geo['diagnosis']}", f"- Rationale: {geo['rationale']}", f"- Best next move: {geo['next_step']}", "", "## Content Structure And Proof", f"- Score: `{geo['content_score']}` / 10"])
+    lines.extend(_proxy_findings(result, "behavioural_reliability"))
     return "\n".join(lines) + "\n"
 
 
@@ -53,19 +66,16 @@ def _declared_channels(result: AuditResult) -> list[tuple[str, str | None]]:
     ]
 
 
-def _proxy_section(result: AuditResult, proxy_name: str) -> list[str]:
+def _proxy_findings(result: AuditResult, proxy_name: str) -> list[str]:
     proxy = next((item for item in result.proxy_results if item.proxy_name == proxy_name), None)
     if proxy is None:
         return ["- No data available for this section."]
-    lines = [f"- Score: `{proxy.score}`", f"- Confidence: `{proxy.confidence}`", ""]
+    lines = []
     if proxy.findings:
-        lines.append("### Findings")
         for finding in proxy.findings:
             lines.append(f"- [{finding.severity}] {finding.headline}: {finding.detail}")
-    if proxy.sub_scores:
-        lines.extend(["", "### Sub-scores"])
-        for key, value in proxy.sub_scores.items():
-            lines.append(f"- `{key}`: `{value}`")
+    if not lines:
+        lines.append("- No notable findings were surfaced for this section in the current run.")
     return lines
 
 

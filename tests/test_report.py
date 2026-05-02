@@ -26,10 +26,12 @@ def test_render_existing_sjk_labs_audit_to_html() -> None:
     assert "SJK Labs" in html
     assert "GEO Narrative Audit" in html
     assert "Declared Channels" in html
-    assert "Narrative Coherence" in html
+    assert "Channel Messaging" in html
+    assert "Narrative Consistency" in html
     assert "Website GEO Readiness" in html
     assert "Spokesperson Alignment" in html
     assert "Content Structure And Proof" in html
+    assert "Diagnosis" in html
     assert "Analyst recommendations to be added before client delivery" in html
 
 
@@ -39,6 +41,7 @@ def test_report_uses_owned_channel_language_not_old_proxy_chart_language() -> No
     assert "Proxy Benchmark Chart" not in html
     assert "Authority Hierarchy" not in html
     assert "Corroboration" not in html
+    assert "/ 10" in html
 
 
 def test_pdf_renders_non_empty_bytes() -> None:

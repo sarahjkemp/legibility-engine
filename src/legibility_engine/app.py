@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel, Field, HttpUrl
 
 from .config import EngineSettings, load_audit_config
+from .geo_summary import build_geo_summary
 from .inputs import infer_founder_name
 from .models import AuditTarget
 from .orchestrator import run_audit
@@ -379,6 +380,7 @@ async def audit_detail(audit_id: str) -> str:
     result = find_audit_by_id(_audits_dir(), audit_id)
     if not result:
         raise HTTPException(status_code=404, detail="Audit not found")
+    geo = build_geo_summary(result)
     consistency = _proxy_by_name(result, "consistency")
     provenance = _proxy_by_name(result, "provenance")
     behavioural = _proxy_by_name(result, "behavioural_reliability")
@@ -395,6 +397,10 @@ async def audit_detail(audit_id: str) -> str:
         )
 
     channel_items = "".join(f"<li><strong>{label}</strong>: {value}</li>" for label, value in _declared_channel_items(result))
+    channel_snapshots_html = "".join(
+        f"<p><strong>{item['label']}:</strong> {item['message']}</p>"
+        for item in geo["channel_snapshots"]
+    ) or "<p>No declared channel snapshots were captured beyond the website.</p>"
     body = "\n".join(
         [
             section_html(
@@ -403,59 +409,51 @@ async def audit_detail(audit_id: str) -> str:
                 [f"<ul>{channel_items}</ul>"] if channel_items else ["No channels were declared beyond the website."],
             ),
             section_html(
+                "Channel Messaging",
+                "What each declared channel is currently saying about the company.",
+                [channel_snapshots_html],
+            ),
+            section_html(
                 "Narrative Coherence",
-                f"Current consistency score: {_format_score(consistency.score if consistency else None, consistency.findings if consistency else [])}.",
+                f"Narrative consistency: {geo['narrative_score']:.1f} / 10." if geo["narrative_score"] is not None else "Narrative consistency score not available.",
                 [f"{item.headline}. {item.detail}" for item in (consistency.findings if consistency else [])]
                 or ["The current run did not produce enough material for a strong narrative-coherence judgment."],
             ),
             section_html(
                 "Website GEO Readiness",
-                f"Current website readiness score: {_format_score(provenance.score if provenance else None, provenance.findings if provenance else [])}.",
+                f"Website GEO readiness: {geo['website_score']:.1f} / 10." if geo["website_score"] is not None else "Website GEO readiness score not available.",
                 [f"{item.headline}. {item.detail}" for item in (provenance.findings if provenance else [])]
                 or ["The website could not yet be assessed in enough depth to produce a strong GEO-readiness judgment."],
             ),
             section_html(
                 "Spokesperson Alignment",
-                f"Current spokesperson alignment score: {_format_score(spokesperson.score if spokesperson else None, spokesperson.findings if spokesperson else [])}.",
+                f"Spokesperson alignment: {geo['spokesperson_score']:.1f} / 10." if geo["spokesperson_score"] is not None else "Spokesperson alignment score not available.",
                 [item.text for item in (spokesperson.findings if spokesperson else [])]
                 or ["No spokesperson channel was supplied, so spokesperson alignment could not yet be assessed."],
             ),
             section_html(
                 "Content Structure And Proof",
-                f"Current content-proof score: {_format_score(behavioural.score if behavioural else None, behavioural.findings if behavioural else [])}.",
+                f"Content structure and proof: {geo['content_score']:.1f} / 10." if geo["content_score"] is not None else "Content structure and proof score not available.",
                 [f"{item.headline}. {item.detail}" for item in (behavioural.findings if behavioural else [])]
                 or ["The current run did not surface enough owned-content proof material to assess claim support cleanly."],
             ),
+            section_html(
+                "Diagnosis",
+                f"Overall GEO readiness: {geo['overall_score']:.1f} / 10." if geo["overall_score"] is not None else "Overall GEO readiness score not available.",
+                [geo["diagnosis"], geo["rationale"], f"Best next move: {geo['next_step']}"],
+            ),
         ]
     )
-    technical_sections = []
+    evidence_html = []
     for proxy in result.proxy_results:
-        sub_sections = []
-        for name, sub_result in proxy.sub_score_results.items():
-            evidence_html = "".join(
-                f"<li><a href='{item.source}' target='_blank' rel='noreferrer'>{item.source}</a><br /><span style='color:#6c625c'>{item.value}</span></li>"
-                for item in sub_result.evidence
-            ) or "<li>No evidence captured.</li>"
-            finding_html = "".join(
-                f"<li><strong>{item.severity}</strong>: {item.text}</li>" for item in sub_result.findings
-            ) or "<li>No findings.</li>"
-            raw_json = json.dumps(sub_result.raw_data, indent=2)
-            sub_sections.append(
-                f"<details style='margin:14px 0;padding:12px 14px;background:#f8f1e7;border-radius:12px;'>"
-                f"<summary><strong>{_labelize(name)}</strong> — {_format_score(sub_result.score, sub_result.findings)} "
-                f"(confidence {sub_result.confidence})</summary>"
-                f"<div style='margin-top:10px;'><p><strong>Findings</strong></p><ul>{finding_html}</ul>"
-                f"<p><strong>Evidence</strong></p><ul>{evidence_html}</ul>"
-                f"<details style='margin-top:10px;'><summary>View raw data</summary><pre style='white-space:pre-wrap;overflow:auto;background:#fffaf4;padding:12px;border-radius:10px;'>{raw_json}</pre></details>"
-                f"</div></details>"
-            )
-        technical_sections.append(
-            f"<details style='background:#fffaf4;border:1px solid #dccfbe;border-radius:16px;padding:18px;margin:14px 0;'>"
-            f"<summary><strong>{_labelize(proxy.proxy_name)}</strong> technical detail</summary>"
-            f"{''.join(sub_sections) or '<p>No sub-scores recorded.</p>'}"
-            f"</details>"
-        )
-    technical_html = "\n".join(technical_sections)
+        for finding in proxy.findings[:4]:
+            evidence_html.append(f"<li><strong>{finding.headline}</strong>: {finding.detail}</li>")
+        for sub_result in proxy.sub_score_results.values():
+            for item in sub_result.evidence[:2]:
+                evidence_html.append(
+                    f"<li><a href='{item.source}' target='_blank' rel='noreferrer'>{item.source}</a><br /><span style='color:#6c625c'>{item.value}</span></li>"
+                )
+    evidence_panel = "".join(evidence_html[:14]) or "<li>No supporting evidence was captured in the current run.</li>"
     confidence_notice = (
         f"<p style='color:#6c625c;'><strong>Audit run with {int(round(result.scores.confidence * 100))}% confidence</strong> — some signal sources were unavailable.</p>"
         if result.scores.confidence < 0.8
@@ -495,9 +493,9 @@ async def audit_detail(audit_id: str) -> str:
     </section>
     {body}
     <section style='background:#fffaf4;border:1px solid #dccfbe;border-radius:16px;padding:18px;margin:14px 0;'>
-      <h2>Technical Detail</h2>
-      <p>These sections preserve the underlying sub-score evidence for analyst inspection while the product language shifts to the GEO audit framing.</p>
-      {technical_html}
+      <h2>Evidence Notes</h2>
+      <p>Supporting evidence captured from the declared channels and the website.</p>
+      <ul>{evidence_panel}</ul>
     </section>
   </main>
 </body>
