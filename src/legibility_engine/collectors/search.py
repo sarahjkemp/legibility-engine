@@ -7,6 +7,13 @@ from xml.etree import ElementTree
 from bs4 import BeautifulSoup
 
 from ..config import EngineSettings
+from ..matching import (
+    canonical_brand_pattern,
+    get_registered_domain,
+    is_strict_brand_match,
+    normalize_brand_text,
+)
+from ..entity import EntityMatch, EntityProfile, assess_entity_match
 from .transport import get_json, get_text
 
 SOCIAL_DOMAINS = {
@@ -164,55 +171,6 @@ def filter_search_results(
             continue
         filtered.append({**result, "registered_domain": domain})
     return filtered
-
-
-def get_registered_domain(value: str) -> str:
-    host = value.lower().strip()
-    if "://" in host:
-        host = urlparse(host).netloc
-    host = host.replace("www.", "").split(":")[0]
-    if not host:
-        return ""
-    parts = [part for part in host.split(".") if part]
-    if len(parts) <= 2:
-        return ".".join(parts)
-    multi_part_suffixes = {
-        "co.uk",
-        "org.uk",
-        "ac.uk",
-        "gov.uk",
-        "com.au",
-        "net.au",
-        "org.au",
-        "co.nz",
-        "com.br",
-    }
-    suffix = ".".join(parts[-2:])
-    if suffix in multi_part_suffixes and len(parts) >= 3:
-        return ".".join(parts[-3:])
-    return ".".join(parts[-2:])
-
-
-def normalize_brand_text(value: str) -> str:
-    lowered = value.lower()
-    cleaned = re.sub(r"[^a-z0-9]+", " ", lowered)
-    return re.sub(r"\s+", " ", cleaned).strip()
-
-
-def canonical_brand_pattern(brand_name: str) -> re.Pattern[str]:
-    canonical = normalize_brand_text(brand_name)
-    if not canonical:
-        raise ValueError("Brand name cannot be empty after normalization")
-    return re.compile(rf"(?<![a-z0-9]){re.escape(canonical)}(?![a-z0-9])")
-
-
-def is_strict_brand_match(brand_name: str, text: str) -> bool:
-    canonical_text = normalize_brand_text(text)
-    if not canonical_text:
-        return False
-    return bool(canonical_brand_pattern(brand_name).search(canonical_text))
-
-
 def filter_to_registered_domain_allowlist(results: list[dict], allowed_domains: set[str]) -> list[dict]:
     if not allowed_domains:
         raise ValueError("Allowed domain list cannot be empty")
@@ -250,4 +208,43 @@ async def verify_brand_matches(results: list[dict], brand_name: str, settings: E
             continue
         if is_strict_brand_match(brand_name, page_text):
             verified.append({**result, "matched_in_page": True})
+    return verified
+
+
+async def verify_entity_matches(
+    results: list[dict],
+    profile: EntityProfile,
+    settings: EngineSettings,
+) -> list[dict]:
+    verified = []
+    for result in results:
+        title = result.get("title") or ""
+        snippet = result.get("snippet") or ""
+        page_text = ""
+        initial = assess_entity_match(profile, title=title, snippet=snippet, url=result.get("url") or "")
+        match = initial
+        if initial.decision != "verified_match":
+            try:
+                page_text = await get_text(result["url"], settings, cache_namespace="search_result_page_text")
+            except Exception:
+                page_text = ""
+            match = assess_entity_match(
+                profile,
+                title=title,
+                snippet=snippet,
+                page_text=page_text[:5000],
+                url=result.get("url") or "",
+            )
+        if match.decision == "verified_match":
+            verified.append(
+                {
+                    **result,
+                    "entity_match": {
+                        "decision": match.decision,
+                        "confidence": match.confidence,
+                        "signals": list(match.signals),
+                        "reasons": list(match.reasons),
+                    },
+                }
+            )
     return verified
