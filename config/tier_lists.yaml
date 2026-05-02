@@ -1,22 +1,69 @@
 tier_1_domains:
+  - ap.org
+  - bbc.co.uk
   - bbc.com
-  - ft.com
+  - bmj.com
   - bloomberg.com
+  - cell.com
+  - economist.com
+  - ft.com
+  - harvard.edu
+  - jamanetwork.com
+  - nature.com
+  - nejm.org
+  - pnas.org
   - reuters.com
   - theguardian.com
+  - telegraph.co.uk
+  - washingtonpost.com
+  - thetimes.com
   - nytimes.com
   - wsj.com
 
 tier_2_domains:
-  - techcrunch.com
-  - sifted.eu
-  - forbes.com
   - businessinsider.com
-  - wired.com
+  - campaignlive.co.uk
+  - cityam.com
+  - consulting.com
+  - consultancy.uk
   - fastcompany.com
+  - forbes.com
+  - managementtoday.co.uk
+  - marketingweek.com
+  - prweek.com
+  - realbusiness.co.uk
+  - saastr.com
+  - sifted.eu
+  - techcrunch.com
+  - theinformation.com
+  - uktech.news
+  - venturebeat.com
+  - wired.com
+
+sector_tier_2_domains:
+  b2b_saas:
+    - techcrunch.com
+    - venturebeat.com
+    - saastr.com
+    - sifted.eu
+    - theinformation.com
+    - uktech.news
+  professional_services:
+    - prweek.com
+    - marketingweek.com
+    - campaignlive.co.uk
+    - realbusiness.co.uk
+    - cityam.com
+  consultancy:
+    - consultancy.uk
+    - consulting.com
+    - managementtoday.co.uk
+  other:
+    - realbusiness.co.uk
+    - managementtoday.co.uk
+    - cityam.com
 
 owned_surface_domains:
   - linkedin.com
   - medium.com
   - substack.com
-

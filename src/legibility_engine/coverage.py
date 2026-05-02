@@ -27,8 +27,9 @@ def _coverage_from_provenance(proxy: ProxyResult | None) -> list[CoverageEntry]:
     if proxy is None:
         return []
     raw = proxy.raw_data
-    metadata = raw.get("metadata", {})
-    structured_keys = raw.get("structured_data_keys", [])
+    metadata = raw.get("publication_metadata", {}).get("substantive_pages") or raw.get("metadata", {})
+    structured_keys = raw.get("publication_metadata", {}).get("complete_pages") or raw.get("structured_data_keys", [])
+    corporate_score = proxy.sub_scores.get("verifiable_corporate_identity")
     return [
         CoverageEntry(
             source_class="owned_site_metadata",
@@ -44,8 +45,8 @@ def _coverage_from_provenance(proxy: ProxyResult | None) -> list[CoverageEntry]:
         ),
         CoverageEntry(
             source_class="corporate_registry",
-            status="found" if proxy.sub_scores.get("verifiable_corporate_identity", 0) > 50 else "missing",
-            detail="Corporate identity evidence supplied." if proxy.sub_scores.get("verifiable_corporate_identity", 0) > 50 else "No strong corporate registry evidence was available in this run.",
+            status="found" if (corporate_score or 0) > 50 else "missing",
+            detail="Corporate identity evidence supplied." if (corporate_score or 0) > 50 else "No strong corporate registry evidence was available in this run.",
             confidence=proxy.confidence,
         ),
     ]
@@ -55,9 +56,9 @@ def _coverage_from_consistency(proxy: ProxyResult | None) -> list[CoverageEntry]
     if proxy is None:
         return []
     raw = proxy.raw_data
-    snapshots = raw.get("snapshots", [])
-    wayback_error = raw.get("wayback_error")
-    llm_output = raw.get("llm_output")
+    snapshots = raw.get("positioning_persistence", {}).get("snapshots", []) or raw.get("snapshots", [])
+    wayback_error = raw.get("positioning_persistence", {}).get("error") or raw.get("wayback_error")
+    llm_output = raw.get("positioning_persistence", {}).get("rationale") or raw.get("llm_output")
     return [
         CoverageEntry(
             source_class="historical_archive",
@@ -78,9 +79,9 @@ def _coverage_from_corroboration(proxy: ProxyResult | None) -> list[CoverageEntr
     if proxy is None:
         return []
     raw = proxy.raw_data
-    claims = raw.get("claims", [])
-    search_domains = raw.get("search_domains", [])
-    sampled_pages = raw.get("sampled_pages", [])
+    claims = raw.get("cross_source_claim_consistency", {}).get("claims", []) or raw.get("claims", [])
+    search_domains = raw.get("independent_mentions", {}).get("distinct_domains", []) or raw.get("search_domains", [])
+    sampled_pages = raw.get("cross_source_claim_consistency", {}).get("sampled_pages", []) or raw.get("sampled_pages", [])
     return [
         CoverageEntry(
             source_class="owned_claim_surfaces",
@@ -107,19 +108,19 @@ def _coverage_from_authority(proxy: ProxyResult | None) -> list[CoverageEntry]:
     if proxy is None:
         return []
     raw = proxy.raw_data
-    tier_1 = raw.get("search_tier_1_hits", []) or raw.get("owned_tier_1_hits", [])
-    tier_2 = raw.get("search_tier_2_hits", []) or raw.get("owned_tier_2_hits", [])
+    tier_1 = raw.get("tier_1_media_presence", {}).get("tier_1_hits", []) or raw.get("search_tier_1_hits", []) or raw.get("owned_tier_1_hits", [])
+    tier_2 = raw.get("tier_2_media_presence", {}).get("tier_2_hits", []) or raw.get("search_tier_2_hits", []) or raw.get("owned_tier_2_hits", [])
     return [
         CoverageEntry(
             source_class="tier_1_authority_surfaces",
             status="found" if tier_1 else "missing",
-            detail=f"Tier 1 hits: {', '.join(tier_1)}" if tier_1 else "No tier 1 authority hits found in this run.",
+            detail=f"Tier 1 hits: {', '.join(item.get('registered_domain', item.get('domain', '')) for item in tier_1[:6])}" if tier_1 else "No tier 1 authority hits found in this run.",
             confidence=proxy.confidence,
         ),
         CoverageEntry(
             source_class="tier_2_authority_surfaces",
             status="found" if tier_2 else "missing",
-            detail=f"Tier 2 hits: {', '.join(tier_2)}" if tier_2 else "No tier 2 authority hits found in this run.",
+            detail=f"Tier 2 hits: {', '.join(item.get('registered_domain', item.get('domain', '')) for item in tier_2[:6])}" if tier_2 else "No tier 2 authority hits found in this run.",
             confidence=proxy.confidence,
         ),
     ]
@@ -129,8 +130,8 @@ def _coverage_from_behavioural(proxy: ProxyResult | None) -> list[CoverageEntry]
     if proxy is None:
         return []
     raw = proxy.raw_data
-    review_hits = raw.get("review_term_hits", 0)
-    case_hits = raw.get("case_study_term_hits", 0)
+    review_hits = len(raw.get("review_presence_and_consistency", {}).get("hits", [])) or raw.get("review_term_hits", 0)
+    case_hits = len(raw.get("fulfillment_evidence", {}).get("candidate_pages", [])) or raw.get("case_study_term_hits", 0)
     return [
         CoverageEntry(
             source_class="review_surfaces",

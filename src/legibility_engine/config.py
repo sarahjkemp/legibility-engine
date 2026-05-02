@@ -44,6 +44,7 @@ class AuditConfig(BaseModel):
     benchmarks: dict[str, BenchmarkConfig]
     tier_1_domains: list[str]
     tier_2_domains: list[str]
+    sector_tier_2_domains: dict[str, list[str]]
     owned_surface_domains: list[str]
     prompt_dir: Path
 
@@ -64,12 +65,18 @@ def load_audit_config(base_dir: Path | None = None) -> AuditConfig:
     root = (base_dir or Path(__file__).resolve().parents[2]) / "config"
     audit_types = _read_yaml(root / "audit_types.yaml").get("audit_types", {})
     benchmarks = _read_yaml(root / "benchmarks.yaml").get("audit_type_benchmarks", {})
-    tier_lists = _read_yaml(root / "tier_lists.yaml")
+    tier_list_path = root / "tier_lists.yaml"
+    if not tier_list_path.exists():
+        raise FileNotFoundError(f"Required tier list config is missing: {tier_list_path}")
+    tier_lists = _read_yaml(tier_list_path)
+    if not tier_lists.get("tier_1_domains") or not tier_lists.get("tier_2_domains"):
+        raise ValueError("tier_lists.yaml must define non-empty tier_1_domains and tier_2_domains")
     return AuditConfig(
         audit_types={key: AuditTypeConfig(**value) for key, value in audit_types.items()},
         benchmarks={key: BenchmarkConfig(**value) for key, value in benchmarks.items()},
         tier_1_domains=tier_lists.get("tier_1_domains", []),
         tier_2_domains=tier_lists.get("tier_2_domains", []),
+        sector_tier_2_domains=tier_lists.get("sector_tier_2_domains", {}),
         owned_surface_domains=tier_lists.get("owned_surface_domains", []),
         prompt_dir=root / "prompts",
     )
