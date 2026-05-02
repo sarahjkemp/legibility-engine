@@ -2,10 +2,8 @@ from __future__ import annotations
 
 from ..config import AuditConfig, EngineSettings
 from ..models import AuditTarget, ProxyResult
-from ..subscore_modules import (
-    behavioural_claim_evidence,
-    behavioural_fulfillment,
-)
+from ..subscore_modules import behavioural_claim_evidence
+from ..subscore_modules import behavioural_fulfillment
 from ..subscores import build_proxy_result, failed_sub_score
 from ..utils import format_exception
 
