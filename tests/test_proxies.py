@@ -10,6 +10,7 @@ from legibility_engine.collectors.search import (
     dedupe_by_registered_domain,
     filter_to_registered_domain_allowlist,
 )
+from legibility_engine.collectors import platform_surfaces
 
 
 @pytest.mark.anyio
@@ -266,3 +267,62 @@ async def test_fulfillment_uses_platform_hosted_owned_surfaces(monkeypatch) -> N
     result = await behavioural_fulfillment.run(target, load_audit_config(), SimpleNamespace())
     assert result.score == 100.0
     assert any(item.source.startswith("https://youtube.com") for item in result.evidence)
+
+
+@pytest.mark.anyio
+async def test_platform_surface_discovery_prefers_explicit_urls(monkeypatch) -> None:
+    seen_queries: list[str] = []
+
+    async def fake_fetch_internal_pages(url: str, settings, limit: int = 6) -> list[dict]:
+        return []
+
+    async def fake_search_web(query: str, settings, limit: int = 4) -> list[dict]:
+        seen_queries.append(query)
+        return []
+
+    monkeypatch.setattr(platform_surfaces, "fetch_internal_pages", fake_fetch_internal_pages)
+    monkeypatch.setattr(platform_surfaces, "search_web", fake_search_web)
+
+    target = AuditTarget(
+        company_name="SJK Labs",
+        primary_url="https://sjklabs.co",
+        audit_type="founder_led",
+        sector="consultancy",
+        official_substack_url="https://sjklabs.substack.com/p/legibility-gap",
+    )
+    result = await platform_surfaces.discover_platform_surfaces(target, SimpleNamespace())
+    assert result["substack"][0]["url"] == "https://sjklabs.substack.com/p/legibility-gap"
+    assert result["substack"][0]["source"] == "explicit_input"
+    assert all("site:substack.com" not in query for query in seen_queries)
+
+
+@pytest.mark.anyio
+async def test_platform_surface_discovery_uses_owned_site_links_before_search(monkeypatch) -> None:
+    async def fake_fetch_internal_pages(url: str, settings, limit: int = 6) -> list[dict]:
+        return [
+            {
+                "url": "https://sjklabs.co/about",
+                "links": [
+                    "https://sjklabs.substack.com/about",
+                    "https://www.youtube.com/@sarahjkemp",
+                    "https://medium.com/@sarahjkemp",
+                ],
+            }
+        ]
+
+    async def fake_search_web(query: str, settings, limit: int = 4) -> list[dict]:
+        raise AssertionError("search should not run when owned-site platform links are present")
+
+    monkeypatch.setattr(platform_surfaces, "fetch_internal_pages", fake_fetch_internal_pages)
+    monkeypatch.setattr(platform_surfaces, "search_web", fake_search_web)
+
+    target = AuditTarget(
+        company_name="SJK Labs",
+        primary_url="https://sjklabs.co",
+        audit_type="founder_led",
+        sector="consultancy",
+    )
+    result = await platform_surfaces.discover_platform_surfaces(target, SimpleNamespace())
+    assert result["substack"][0]["source"] == "owned_site_link"
+    assert result["youtube"][0]["url"] == "https://www.youtube.com/@sarahjkemp"
+    assert result["medium"][0]["url"] == "https://medium.com/@sarahjkemp"

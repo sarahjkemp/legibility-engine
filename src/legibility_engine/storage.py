@@ -35,6 +35,9 @@ def load_audit_result(path: Path) -> AuditResult:
     target.setdefault("sector", "other")
     target.setdefault("founder_linkedin_url", None)
     target.setdefault("founder_name", None)
+    target.setdefault("official_substack_url", None)
+    target.setdefault("official_medium_url", None)
+    target.setdefault("official_youtube_url", None)
     target.setdefault("competitor_urls", [])
     data["target"] = target
     scores = data.get("scores", {})

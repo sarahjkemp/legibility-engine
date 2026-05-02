@@ -28,6 +28,9 @@ def audit(
     companies_house_id: str | None = typer.Option(None, help="Optional Companies House identifier."),
     founder_linkedin_url: str | None = typer.Option(None, help="Optional founder LinkedIn URL."),
     founder_name: str | None = typer.Option(None, help="Optional founder name."),
+    official_substack_url: str | None = typer.Option(None, help="Optional official Substack URL."),
+    official_medium_url: str | None = typer.Option(None, help="Optional official Medium URL."),
+    official_youtube_url: str | None = typer.Option(None, help="Optional official YouTube URL."),
     competitor_urls: list[str] | None = typer.Option(None, help="Up to three competitor URLs."),
     output_dir: Path = typer.Option(Path("audits"), help="Directory for generated files."),
 ) -> None:
@@ -40,6 +43,9 @@ def audit(
         companies_house_id=companies_house_id,
         founder_linkedin_url=founder_linkedin_url,
         founder_name=infer_founder_name(founder_linkedin_url, founder_name),
+        official_substack_url=official_substack_url,
+        official_medium_url=official_medium_url,
+        official_youtube_url=official_youtube_url,
         competitor_urls=(competitor_urls or [])[:3],
     )
     result = asyncio.run(run_audit(target, config=load_audit_config(), settings=settings))

@@ -24,6 +24,9 @@ class CreateAuditRequest(BaseModel):
     companies_house_id: str | None = None
     founder_linkedin_url: HttpUrl | None = None
     founder_name: str | None = None
+    official_substack_url: HttpUrl | None = None
+    official_medium_url: HttpUrl | None = None
+    official_youtube_url: HttpUrl | None = None
     competitor_urls: list[HttpUrl] = Field(default_factory=list)
 
 
@@ -116,6 +119,12 @@ async def dashboard() -> str:
         <input id="founder_linkedin_url" placeholder="https://www.linkedin.com/in/..." />
         <label>Founder name (optional)</label>
         <input id="founder_name" placeholder="If blank, we infer it from LinkedIn when possible" />
+        <label>Official Substack URL (optional)</label>
+        <input id="official_substack_url" placeholder="https://yourpublication.substack.com" />
+        <label>Official Medium URL (optional)</label>
+        <input id="official_medium_url" placeholder="https://medium.com/@you or publication URL" />
+        <label>Official YouTube URL (optional)</label>
+        <input id="official_youtube_url" placeholder="https://www.youtube.com/@channel" />
         <label>Competitor URLs (optional)</label>
         <textarea id="competitor_urls" placeholder="One per line or comma-separated" style="width:100%;box-sizing:border-box;border-radius:12px;border:1px solid #dccfbe;padding:12px 14px;font:inherit;min-height:92px;"></textarea>
         <button id="run_button" onclick="runAudit()">Run audit</button>
@@ -204,6 +213,9 @@ async def dashboard() -> str:
         companies_house_id: document.getElementById('companies_house_id').value || null,
         founder_linkedin_url: document.getElementById('founder_linkedin_url').value || null,
         founder_name: document.getElementById('founder_name').value || null,
+        official_substack_url: document.getElementById('official_substack_url').value || null,
+        official_medium_url: document.getElementById('official_medium_url').value || null,
+        official_youtube_url: document.getElementById('official_youtube_url').value || null,
         competitor_urls: competitorUrls
       }};
       const status = document.getElementById('status');
@@ -252,6 +264,9 @@ async def create_audit(request: CreateAuditRequest) -> dict:
                 str(request.founder_linkedin_url) if request.founder_linkedin_url else None,
                 request.founder_name,
             ),
+            official_substack_url=request.official_substack_url,
+            official_medium_url=request.official_medium_url,
+            official_youtube_url=request.official_youtube_url,
             competitor_urls=request.competitor_urls[:3],
         )
         result = await run_audit(target, config=load_audit_config(), settings=settings)

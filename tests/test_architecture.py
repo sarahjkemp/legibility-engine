@@ -78,5 +78,8 @@ def test_load_audit_result_backfills_new_target_fields(tmp_path: Path) -> None:
 
     assert result.target.sector == "other"
     assert result.target.founder_name is None
+    assert result.target.official_substack_url is None
+    assert result.target.official_medium_url is None
+    assert result.target.official_youtube_url is None
     assert result.target.competitor_urls == []
     assert result.scores.confidence == 0.0

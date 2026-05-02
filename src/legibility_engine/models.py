@@ -19,6 +19,9 @@ class AuditTarget(BaseModel):
     companies_house_id: str | None = None
     founder_linkedin_url: HttpUrl | None = None
     founder_name: str | None = None
+    official_substack_url: HttpUrl | None = None
+    official_medium_url: HttpUrl | None = None
+    official_youtube_url: HttpUrl | None = None
     competitor_urls: list[HttpUrl] = Field(default_factory=list)
     social_handles: dict[str, str] = Field(default_factory=dict)
 
