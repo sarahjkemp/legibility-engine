@@ -4,7 +4,7 @@ services:
     env: python
     plan: starter
     buildCommand: pip install -e .
-    startCommand: uvicorn legibility_engine.app:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn geo_narrative_audit.app:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: ANTHROPIC_API_KEY
         sync: false

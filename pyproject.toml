@@ -17,6 +17,7 @@ dependencies = [
   "Jinja2>=3.1.4",
   "pydantic>=2.7.0",
   "pydantic-settings>=2.2.1",
+  "python-multipart>=0.0.9",
   "python-whois>=0.9.5",
   "pyyaml>=6.0.1",
   "tenacity>=8.2.3",
@@ -33,6 +34,8 @@ dev = [
 [project.scripts]
 legibility = "legibility_engine.cli:app"
 legibility-web = "legibility_engine.app:run_dev"
+geo-audit = "geo_narrative_audit.cli:app"
+geo-audit-web = "geo_narrative_audit.app:run_dev"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

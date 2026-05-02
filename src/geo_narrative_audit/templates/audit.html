@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ record.company_name }} GEO Audit</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700;800&display=swap');
+    :root {
+      --cream: #f6efe5;
+      --paper: rgba(255, 250, 244, 0.88);
+      --ink: #181512;
+      --muted: #6b645c;
+      --forest: #17382d;
+      --rust: #a55d3b;
+      --moss: #dfe9dd;
+      --line: rgba(41, 31, 18, 0.10);
+      --shadow: 0 24px 72px rgba(38, 30, 20, 0.10);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 84% 8%, rgba(239, 248, 233, 0.95), transparent 22%),
+        radial-gradient(circle at 16% 14%, rgba(255, 234, 214, 0.92), transparent 24%),
+        linear-gradient(180deg, #fbf7f1 0%, var(--cream) 55%, #efe4d8 100%);
+      font-family: "Manrope", sans-serif;
+    }
+    main { max-width: 1120px; margin: 0 auto; padding: 34px 24px 80px; }
+    a { color: var(--forest); text-decoration: none; }
+    .back { color: var(--muted); font-size: 0.94rem; }
+    .hero, section {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 34px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+    .hero { padding: 34px; margin-bottom: 22px; position: relative; overflow: hidden; }
+    .hero::after {
+      content: "";
+      position: absolute;
+      width: 280px;
+      height: 280px;
+      right: -80px;
+      top: -80px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(24,56,45,0.11), transparent 68%);
+    }
+    .eyebrow {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--forest);
+      font-weight: 800;
+    }
+    h1, h2 {
+      font-family: "Instrument Serif", serif;
+      font-weight: 400;
+      letter-spacing: -0.04em;
+    }
+    h1 {
+      margin: 18px 0 10px;
+      font-size: clamp(3rem, 6vw, 5.4rem);
+      line-height: 0.95;
+      max-width: 720px;
+    }
+    .hero-lead {
+      max-width: 760px;
+      font-size: 1.14rem;
+      line-height: 1.85;
+      color: #49443d;
+    }
+    .hero-diagnosis {
+      margin-top: 22px;
+      max-width: 860px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      font-size: 1.06rem;
+      line-height: 1.8;
+      color: #3d3832;
+    }
+    .score-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      margin: 24px 0 22px;
+    }
+    .score-card {
+      background: rgba(255,255,255,0.6);
+      border: 1px solid rgba(24,56,45,0.10);
+      border-radius: 24px;
+      padding: 20px;
+    }
+    .score-label {
+      color: var(--forest);
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-weight: 800;
+    }
+    .score-value {
+      margin-top: 10px;
+      font-family: "Instrument Serif", serif;
+      font-size: 2.9rem;
+      line-height: 0.95;
+    }
+    .score-sub {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.6;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 1.05fr .95fr;
+      gap: 22px;
+    }
+    section { padding: 28px; margin-bottom: 22px; }
+    h2 { margin: 0 0 10px; font-size: 2.1rem; line-height: 1; }
+    .section-copy {
+      margin: 0 0 18px;
+      color: #544e47;
+      line-height: 1.75;
+    }
+    .stack { display: grid; gap: 14px; }
+    .channel-card {
+      padding: 18px 18px 16px;
+      border-radius: 22px;
+      background: rgba(255,255,255,0.62);
+      border: 1px solid rgba(24,56,45,0.08);
+    }
+    .channel-label {
+      color: var(--forest);
+      text-transform: uppercase;
+      letter-spacing: 0.11em;
+      font-size: 0.77rem;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+    .channel-copy {
+      font-size: 1rem;
+      line-height: 1.78;
+      color: #27231f;
+    }
+    .muted { color: var(--muted); }
+    ul.clean {
+      margin: 0;
+      padding-left: 20px;
+    }
+    ul.clean li {
+      margin: 0 0 12px;
+      line-height: 1.75;
+      color: #2f2a25;
+    }
+    .action-card {
+      padding: 18px 18px 16px;
+      border-radius: 22px;
+      background: linear-gradient(180deg, rgba(223,233,221,0.65), rgba(255,255,255,0.68));
+      border: 1px solid rgba(24,56,45,0.08);
+      margin-bottom: 14px;
+    }
+    .action-title {
+      font-weight: 800;
+      margin-bottom: 8px;
+      color: #17382d;
+    }
+    .action-why, .action-how {
+      margin: 0 0 8px;
+      color: #3f3a34;
+      line-height: 1.7;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 18px;
+    }
+    .meta-box {
+      padding: 16px 18px;
+      border-radius: 22px;
+      background: rgba(255,255,255,0.58);
+      border: 1px solid rgba(24,56,45,0.08);
+    }
+    .meta-label {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--forest);
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+    .meta-value {
+      color: #332f2b;
+      line-height: 1.7;
+      font-size: 0.97rem;
+    }
+    @media (max-width: 980px) {
+      .score-grid, .layout, .meta-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="back"><a href="/">← Back to dashboard</a></p>
+
+    <section class="hero">
+      <div class="eyebrow">GEO Narrative Audit</div>
+      <h1>{{ record.company_name }}</h1>
+      <p class="hero-lead">This audit reads only the channels you declared, then judges whether they are compounding one clear story strongly enough for AI systems to retrieve, summarize, and repeat with confidence.</p>
+
+      <div class="score-grid">
+        <div class="score-card">
+          <div class="score-label">Overall GEO Readiness</div>
+          <div class="score-value">{{ "%.1f"|format(record.scores.overall_geo_readiness) }}/10</div>
+          <div class="score-sub">The simple top-line answer to whether the current owned-channel narrative is ready to carry retrieval and authority.</div>
+        </div>
+        <div class="score-card">
+          <div class="score-label">Narrative Consistency</div>
+          <div class="score-value">{{ "%.1f"|format(record.scores.narrative_consistency) }}/10</div>
+          <div class="score-sub">How consistently the same story is being expressed across the declared channels.</div>
+        </div>
+        <div class="score-card">
+          <div class="score-label">Website GEO Readiness</div>
+          <div class="score-value">{{ "%.1f"|format(record.scores.website_geo_readiness) }}/10</div>
+          <div class="score-sub">How well the website is currently acting as a retrievable source of truth.</div>
+        </div>
+        <div class="score-card">
+          <div class="score-label">Spokesperson Alignment</div>
+          <div class="score-value">{{ "%.1f"|format(record.scores.spokesperson_alignment) }}/10</div>
+          <div class="score-sub">How well the spokesperson surfaces reinforce rather than dilute the company narrative.</div>
+        </div>
+      </div>
+
+      <div class="hero-diagnosis">
+        <strong>Diagnosis:</strong> {{ record.diagnosis }}
+      </div>
+    </section>
+
+    <div class="layout">
+      <div>
+        <section>
+          <h2>What each channel is saying</h2>
+          <p class="section-copy">These are the actual messages the audit was able to pull from the declared surfaces. This is the story AI systems are most likely to encounter first.</p>
+          <div class="stack">
+            {% for channel in record.channels %}
+              <div class="channel-card">
+                <div class="channel-label">{{ channel.label }}</div>
+                <div class="channel-copy">{{ channel.message }}</div>
+                {% if channel.blocked %}
+                  <p class="muted">This page did not yield enough clean text for a stronger summary, which weakens confidence on this surface.</p>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section>
+          <h2>What AI is likely to learn</h2>
+          <p class="section-copy">The strongest repeated themes that survive across the owned surfaces.</p>
+          <ul class="clean">
+            {% for item in record.narrative_spine %}
+              <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        </section>
+
+        <section>
+          <h2>Where the story breaks</h2>
+          <p class="section-copy">The places where the narrative thins out, becomes uneven, or stops compounding cleanly enough to support retrieval.</p>
+          <ul class="clean">
+            {% for item in record.where_the_story_breaks %}
+              <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        </section>
+      </div>
+
+      <div>
+        <section>
+          <h2>Website readout</h2>
+          <p class="section-copy">Because the website is usually the strongest owned retrieval surface, this is where the GEO-readiness judgment is anchored first.</p>
+          <ul class="clean">
+            {% for item in record.website_findings %}
+              <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        </section>
+
+        <section>
+          <h2>Why this affects AI retrieval</h2>
+          <p class="section-copy">{{ record.retrieval_impact }}</p>
+          <ul class="clean">
+            {% for item in record.rationale %}
+              <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        </section>
+
+        <section>
+          <h2>What to fix first</h2>
+          <p class="section-copy">This is the part that sets up the strategic next step. The goal is to make the owned narrative cleaner before adding more authority on top.</p>
+          {% for item in record.what_to_fix_first %}
+            <div class="action-card">
+              <div class="action-title">{{ item.title }}</div>
+              <p class="action-why"><strong>Why it matters:</strong> {{ item.why_it_matters }}</p>
+              <p class="action-how"><strong>What to do:</strong> {{ item.what_to_do }}</p>
+            </div>
+          {% endfor %}
+        </section>
+
+        <section>
+          <h2>Audit context</h2>
+          <div class="meta-grid">
+            <div class="meta-box">
+              <div class="meta-label">Run date</div>
+              <div class="meta-value">{{ record.created_at.strftime("%-d %B %Y") }}</div>
+            </div>
+            <div class="meta-box">
+              <div class="meta-label">Declared surfaces</div>
+              <div class="meta-value">{{ record.channels|length }} captured channels</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
