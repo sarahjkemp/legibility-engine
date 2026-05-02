@@ -33,46 +33,9 @@ async def run_audit(audit_input: AuditInput, settings: AppSettings) -> AuditReco
 
 
 async def _collect_channels(audit_input: AuditInput, settings: AppSettings) -> list[ChannelSurface]:
-    declared = [
-        ("website", "Website", "company", "website", str(audit_input.website_url)),
-        ("company_linkedin", "Company LinkedIn", "company", "linkedin", _value(audit_input.company_linkedin_url)),
-        ("company_substack", "Company Substack", "company", "substack", _value(audit_input.company_substack_url)),
-        ("company_medium", "Company Medium", "company", "medium", _value(audit_input.company_medium_url)),
-        ("company_youtube", "Company YouTube", "company", "youtube", _value(audit_input.company_youtube_url)),
-        (
-            "spokesperson_linkedin",
-            f"{audit_input.spokesperson_name or 'Spokesperson'} LinkedIn",
-            "spokesperson",
-            "linkedin",
-            _value(audit_input.spokesperson_linkedin_url),
-        ),
-        (
-            "spokesperson_substack",
-            f"{audit_input.spokesperson_name or 'Spokesperson'} Substack",
-            "spokesperson",
-            "substack",
-            _value(audit_input.spokesperson_substack_url),
-        ),
-        (
-            "spokesperson_medium",
-            f"{audit_input.spokesperson_name or 'Spokesperson'} Medium",
-            "spokesperson",
-            "medium",
-            _value(audit_input.spokesperson_medium_url),
-        ),
-        (
-            "spokesperson_youtube",
-            f"{audit_input.spokesperson_name or 'Spokesperson'} YouTube",
-            "spokesperson",
-            "youtube",
-            _value(audit_input.spokesperson_youtube_url),
-        ),
-    ]
-
     channels: list[ChannelSurface] = []
-    for key, label, role, platform, url in declared:
-        if not url:
-            continue
+    declared = _declared_surfaces(audit_input)
+    for key, label, role, platform, surface_type, url in declared:
         page = await fetch_page_snapshot(url, settings)
         blocked = not bool(page["text"])
         message = first_meaningful_sentence(page["excerpt"] or page["text"])
@@ -85,6 +48,7 @@ async def _collect_channels(audit_input: AuditInput, settings: AppSettings) -> l
                 role=role,
                 platform=platform,
                 url=url,
+                surface_type=surface_type,
                 fetched=bool(page["text"]),
                 blocked=blocked,
                 message=message,
@@ -168,10 +132,12 @@ def _fallback_analysis(audit_input: AuditInput, channels: list[ChannelSurface]) 
     terms = compact_terms(company_texts + spokesperson_texts, audit_input.company_name)
     overlap = sum(1 for term in terms[:6] if any(term in text.lower() for text in spokesperson_texts)) if spokesperson_texts else 0
 
-    website = next((channel for channel in channels if channel.platform == "website"), None)
+    website = next((channel for channel in channels if channel.platform == "website" and channel.key == "website"), None)
+    company_content_count = len([channel for channel in company_channels if channel.surface_type == "content"])
+    spokesperson_content_count = len([channel for channel in spokesperson_channels if channel.surface_type == "content"])
     website_score = _website_score(website)
-    narrative = _narrative_score(company_channels, spokesperson_channels, terms)
-    spokesperson = _spokesperson_score(spokesperson_channels, overlap)
+    narrative = _narrative_score(company_channels, spokesperson_channels, terms, company_content_count, spokesperson_content_count)
+    spokesperson = _spokesperson_score(spokesperson_channels, overlap, spokesperson_content_count)
     overall = round(mean([narrative, website_score, spokesperson]), 1)
 
     narrative_spine = [
@@ -185,7 +151,7 @@ def _fallback_analysis(audit_input: AuditInput, channels: list[ChannelSurface]) 
     ]
     where_the_story_breaks = [
         (
-            "Several declared channels yielded no usable text, which means the brand is not repeating the story cleanly enough across all owned surfaces."
+            "Several declared channels or representative content links yielded no usable text, which means the brand is not repeating the story cleanly enough across all owned surfaces."
             if any(channel.blocked for channel in channels)
             else "The main risk is not contradiction, but uneven repetition across channels."
         ),
@@ -207,7 +173,7 @@ def _fallback_analysis(audit_input: AuditInput, channels: list[ChannelSurface]) 
     rationale = [
         f"{len(company_channels)} company-owned channels yielded usable content in this run.",
         (
-            f"{len(spokesperson_channels)} spokesperson channels yielded usable content, giving a moderate alignment signal."
+            f"{len(spokesperson_channels)} spokesperson surfaces yielded usable content, giving a moderate alignment signal."
             if spokesperson_channels
             else "No spokesperson channel yielded strong text, so spokesperson alignment is provisional."
         ),
@@ -215,6 +181,11 @@ def _fallback_analysis(audit_input: AuditInput, channels: list[ChannelSurface]) 
             f"The website snapshot carried approximately {website.word_count} words of visible text."
             if website
             else "No website snapshot was available, limiting the GEO-readiness judgment."
+        ),
+        (
+            f"{company_content_count + spokesperson_content_count} representative article/post/video URLs were captured, which gives a stronger read on actual messaging than profile pages alone."
+            if company_content_count + spokesperson_content_count
+            else "No representative article/post/video URLs were supplied, so the audit is still leaning more heavily on profile pages than ideal."
         ),
     ]
     what_to_fix_first = [
@@ -274,19 +245,26 @@ def _narrative_score(
     company_channels: list[ChannelSurface],
     spokesperson_channels: list[ChannelSurface],
     terms: list[str],
+    company_content_count: int,
+    spokesperson_content_count: int,
 ) -> float:
     score = 3.6
     score += min(len(company_channels) * 0.6, 2.0)
     score += min(len(terms[:5]) * 0.35, 1.8)
     if spokesperson_channels:
         score += 0.8
+    score += min(company_content_count * 0.35, 1.0)
+    score += min(spokesperson_content_count * 0.25, 0.8)
     return min(round(score, 1), 10.0)
 
 
-def _spokesperson_score(spokesperson_channels: list[ChannelSurface], overlap: int) -> float:
+def _spokesperson_score(spokesperson_channels: list[ChannelSurface], overlap: int, spokesperson_content_count: int) -> float:
     if not spokesperson_channels:
         return 3.0
-    return min(round(4.0 + overlap + min(len(spokesperson_channels) * 0.5, 1.5), 1), 10.0)
+    return min(
+        round(4.0 + overlap + min(len(spokesperson_channels) * 0.5, 1.5) + min(spokesperson_content_count * 0.35, 1.0), 1),
+        10.0,
+    )
 
 
 def _website_findings(website: ChannelSurface | None) -> list[str]:
@@ -310,3 +288,55 @@ def _website_findings(website: ChannelSurface | None) -> list[str]:
 
 def _value(url: object) -> str | None:
     return str(url) if url else None
+
+
+def _declared_surfaces(audit_input: AuditInput) -> list[tuple[str, str, str, str, str, str]]:
+    surfaces: list[tuple[str, str, str, str, str, str]] = []
+    surfaces.append(("website", "Website", "company", "website", "website", str(audit_input.website_url)))
+    if audit_input.about_page_url:
+        surfaces.append(("about_page", "About Page", "company", "website", "content", str(audit_input.about_page_url)))
+
+    surfaces.extend(_platform_surfaces("company", "Company", "linkedin", audit_input.company_linkedin_url, audit_input.company_linkedin_post_urls))
+    surfaces.extend(_platform_surfaces("company", "Company", "substack", audit_input.company_substack_url, audit_input.company_substack_article_urls))
+    surfaces.extend(_platform_surfaces("company", "Company", "medium", audit_input.company_medium_url, audit_input.company_medium_article_urls))
+    surfaces.extend(_platform_surfaces("company", "Company", "youtube", audit_input.company_youtube_url, audit_input.company_youtube_video_urls))
+
+    spokesperson = audit_input.spokesperson_name or "Spokesperson"
+    surfaces.extend(_platform_surfaces("spokesperson", spokesperson, "linkedin", audit_input.spokesperson_linkedin_url, audit_input.spokesperson_linkedin_post_urls))
+    surfaces.extend(_platform_surfaces("spokesperson", spokesperson, "substack", audit_input.spokesperson_substack_url, audit_input.spokesperson_substack_article_urls))
+    surfaces.extend(_platform_surfaces("spokesperson", spokesperson, "medium", audit_input.spokesperson_medium_url, audit_input.spokesperson_medium_article_urls))
+    surfaces.extend(_platform_surfaces("spokesperson", spokesperson, "youtube", audit_input.spokesperson_youtube_url, audit_input.spokesperson_youtube_video_urls))
+    return surfaces
+
+
+def _platform_surfaces(
+    role: str,
+    label_prefix: str,
+    platform: str,
+    profile_url: object,
+    content_urls: list[object],
+) -> list[tuple[str, str, str, str, str, str]]:
+    surfaces: list[tuple[str, str, str, str, str, str]] = []
+    if profile_url:
+        surfaces.append(
+            (
+                f"{role}_{platform}_profile",
+                f"{label_prefix} {platform.title()} Profile",
+                role,
+                platform,
+                "profile",
+                str(profile_url),
+            )
+        )
+    for index, url in enumerate(content_urls[:3], start=1):
+        surfaces.append(
+            (
+                f"{role}_{platform}_content_{index}",
+                f"{label_prefix} {platform.title()} Content {index}",
+                role,
+                platform,
+                "content",
+                str(url),
+            )
+        )
+    return surfaces

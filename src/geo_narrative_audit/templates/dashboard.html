@@ -145,7 +145,20 @@
       font: inherit;
       color: var(--ink);
     }
+    textarea {
+      width: 100%;
+      margin-top: 8px;
+      padding: 15px 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(24,57,47,0.15);
+      background: rgba(255,255,255,0.92);
+      font: inherit;
+      color: var(--ink);
+      min-height: 116px;
+      resize: vertical;
+    }
     input::placeholder { color: #9b9085; }
+    textarea::placeholder { color: #9b9085; }
     .group-title {
       margin: 22px 0 14px;
       font-size: 0.82rem;
@@ -251,7 +264,7 @@
     <div class="grid">
       <section class="panel form-panel">
         <h2>Declare the channels</h2>
-        <p class="section-copy">Supply only the surfaces you want assessed. The app will analyze those channels, summarize the message each one is projecting, and judge whether the narrative compounds cleanly enough for GEO.</p>
+        <p class="section-copy">Supply the core profile URLs if you want them assessed, but for the strongest readout, add exact article, post, or video URLs that actually carry the narrative. Those are far more reliable than generic profile pages.</p>
         <form method="post" action="/audits" id="audit-form">
           <div class="field-grid">
             <label class="full">Company name
@@ -260,21 +273,40 @@
             <label class="full">Website
               <input type="url" name="website_url" placeholder="https://sjklabs.co" required>
             </label>
+            <label class="full">About page
+              <input type="url" name="about_page_url" placeholder="https://sjklabs.co/about">
+            </label>
           </div>
 
-          <div class="group-title">Company channels</div>
+          <div class="group-title">Company profiles</div>
           <div class="field-grid">
-            <label>LinkedIn
+            <label>LinkedIn profile
               <input type="url" name="company_linkedin_url" placeholder="https://www.linkedin.com/company/...">
             </label>
-            <label>Substack
+            <label>Substack publication
               <input type="url" name="company_substack_url" placeholder="https://company.substack.com">
             </label>
-            <label>Medium
+            <label>Medium profile
               <input type="url" name="company_medium_url" placeholder="https://medium.com/@company">
             </label>
-            <label>YouTube
+            <label>YouTube channel
               <input type="url" name="company_youtube_url" placeholder="https://www.youtube.com/@company">
+            </label>
+          </div>
+
+          <div class="group-title">Representative company content</div>
+          <div class="field-grid">
+            <label class="full">LinkedIn posts
+              <textarea name="company_linkedin_post_urls" placeholder="One exact post URL per line"></textarea>
+            </label>
+            <label class="full">Substack articles
+              <textarea name="company_substack_article_urls" placeholder="One exact article URL per line"></textarea>
+            </label>
+            <label class="full">Medium articles
+              <textarea name="company_medium_article_urls" placeholder="One exact article URL per line"></textarea>
+            </label>
+            <label class="full">YouTube videos
+              <textarea name="company_youtube_video_urls" placeholder="One exact video URL per line"></textarea>
             </label>
           </div>
 
@@ -283,17 +315,33 @@
             <label class="full">Spokesperson name
               <input type="text" name="spokesperson_name" placeholder="Sarah Kemp">
             </label>
-            <label>LinkedIn
+            <label>LinkedIn profile
               <input type="url" name="spokesperson_linkedin_url" placeholder="https://www.linkedin.com/in/...">
             </label>
-            <label>Substack
+            <label>Substack publication
               <input type="url" name="spokesperson_substack_url" placeholder="https://open.substack.com/pub/...">
             </label>
-            <label>Medium
+            <label>Medium profile
               <input type="url" name="spokesperson_medium_url" placeholder="https://medium.com/@name">
             </label>
-            <label>YouTube
+            <label>YouTube channel
               <input type="url" name="spokesperson_youtube_url" placeholder="https://www.youtube.com/@name">
+            </label>
+          </div>
+
+          <div class="group-title">Representative spokesperson content</div>
+          <div class="field-grid">
+            <label class="full">LinkedIn posts
+              <textarea name="spokesperson_linkedin_post_urls" placeholder="One exact post URL per line"></textarea>
+            </label>
+            <label class="full">Substack articles
+              <textarea name="spokesperson_substack_article_urls" placeholder="One exact article URL per line"></textarea>
+            </label>
+            <label class="full">Medium articles
+              <textarea name="spokesperson_medium_article_urls" placeholder="One exact article URL per line"></textarea>
+            </label>
+            <label class="full">YouTube videos
+              <textarea name="spokesperson_youtube_video_urls" placeholder="One exact video URL per line"></textarea>
             </label>
           </div>
 
@@ -304,7 +352,7 @@
               <span>Running audit. Pulling channel content and building the scorecard now.</span>
             </div>
           </div>
-          <p class="micro-note">Best results come from supplying the website plus at least one company channel and one spokesperson channel.</p>
+          <p class="micro-note">Best results come from supplying the website plus a few exact article, post, or video URLs that represent the message you actually want assessed.</p>
         </form>
       </section>
 
